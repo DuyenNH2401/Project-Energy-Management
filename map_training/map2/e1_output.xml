@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-01-31T23:22:43.316283+07:00 by Eclipse SUMO GUI 1.25.0
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_buslanes.net.xml"/>
+        <route-files value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio.rou.xml"/>
+        <additional-files value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_vtypes.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_bus_stops.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_busses.rou.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_detectors.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_tls.add.xml"/>
+    </input>
+
+    <output>
+        <tripinfo-output value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/tripinfos.xml"/>
+    </output>
+
+    <report>
+        <log value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/sumo_log.txt"/>
+        <no-step-log value="true"/>
+    </report>
+
+</sumoConfiguration>
+-->
+
+<detector xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/det_e1_file.xsd">
+</detector>

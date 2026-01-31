@@ -1,0 +1,26 @@
+Loading net-file from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/network.net.xml.gz' ... done (79ms).
+Loading additional-files from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/busStops.add.xml' ... done (23ms).
+Loading route-files incrementally from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/bus_route.rou.xml'
+Loading route-files incrementally from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/vType.xml'
+Loading route-files incrementally from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/PKW_automatic.rou.xml.gz'
+Loading route-files incrementally from '/home/ducanh/My_SUMO/sumo-scenarios/TAVF-Hamburg/LKW_automatic.rou.xml'
+Loading done.
+Simulation started with time: 0.00.
+Simulation ended at time: 254.00.
+Performance:
+ Duration: 12.22s
+ Real time factor: 20.7873
+ UPS: 13217.775595
+Vehicles:
+ Inserted: 1512 (Loaded: 2385)
+ Running: 1009
+ Waiting: 2
+Statistics (avg of 503):
+ RouteLength: 1310.08
+ Speed: 10.53
+ Duration: 127.48
+ WaitingTime: 20.94
+ TimeLoss: 31.04
+ DepartDelay: 0.64
+DijkstraRouter answered 1489 queries and explored 94.45 edges on average.
+DijkstraRouter spent 0.06s answering queries (0.04ms on average).

@@ -1,0 +1,17 @@
+Loading net-file from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_buslanes.net.xml' ... done (17ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_vtypes.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_bus_stops.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_busses.rou.xml' ... done (7ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_detectors.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio.rou.xml'
+Loading done.
+Simulation ended at time: 0.00.
+Performance:
+ Duration: 13.55s
+ Real time factor: 0
+ UPS: 0.000000
+Vehicles:
+ Inserted: 0 (Loaded: 121)
+ Running: 0
+ Waiting: 0

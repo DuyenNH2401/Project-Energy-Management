@@ -1,2 +1,2 @@
 # Project-Energy-Management
-energy management
+This is where the environment (SUMO's maps) is placed.
