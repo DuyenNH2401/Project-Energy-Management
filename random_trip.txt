@@ -1,0 +1,1 @@
+python $SUMO_HOME/tools/randomTrips.py -n cologne8_final.net.xml -r cologne8_final.rou.xml     -e 3600 --flows 30 -p 1.5     -t 'type="DEFAULT_VEHTYPE"'     --fringe-factor 100     --min-distance 800     --maxtries 250   --lanes  --random
