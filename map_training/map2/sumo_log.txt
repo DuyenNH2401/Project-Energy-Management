@@ -1,17 +1,18 @@
 Loading net-file from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_buslanes.net.xml' ... done (17ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_vtypes.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_vtypes.add.xml' ... done (3ms).
 Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_bus_stops.add.xml' ... done (0ms).
 Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_busses.rou.xml' ... done (7ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_detectors.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_detectors.add.xml' ... done (1ms).
 Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_tls.add.xml' ... done (1ms).
 Loading route-files incrementally from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio.rou.xml'
 Loading done.
-Simulation ended at time: 0.00.
+Simulation started with time: 0.00.
+Simulation ended at time: 260.00.
 Performance:
- Duration: 13.55s
- Real time factor: 0
- UPS: 0.000000
+ Duration: 16.12s
+ Real time factor: 16.125
+ UPS: 4411.126271
 Vehicles:
- Inserted: 0 (Loaded: 121)
- Running: 0
+ Inserted: 642 (Loaded: 1081)
+ Running: 431
  Waiting: 0

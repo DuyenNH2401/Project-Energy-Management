@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-02-01T00:06:18.983507+07:00 by Eclipse SUMO GUI 1.25.0
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/net.net.xml.gz"/>
+        <route-files value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/samplertrips.rou.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/samplertrips_bike.rou.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/parking_heavy.rou.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/parking_vehicle.rou.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/pt_lines.rou.xml"/>
+        <additional-files value="/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/vtypes.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/additional_bike.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/additional.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/stops.add.xml,/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map4/tram_tls.add.xml"/>
+    </input>
+
+    <time>
+        <begin value="50300"/>
+        <end value="54100"/>
+    </time>
+
+    <processing>
+        <time-to-teleport value="100"/>
+        <time-to-teleport.bidi value="70"/>
+    </processing>
+
+    <report>
+        <duration-log.statistics value="true"/>
+    </report>
+
+</sumoConfiguration>
+-->
+
+<meandata xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/meandata_file.xsd">
+    <interval begin="50300.00" end="52340.00" id="sim_bike">
+        <edge id="178028204#9" sampledSeconds="85.76" traveltime="1.76" overlapTraveltime="2.14" density="5.67" overlapDensity="6.89" laneDensity="2.84" occupancy="0.46" waitingTime="8.00" timeLoss="30.87" speed="3.59" speedRelative="0.43" departed="0" arrived="0" entered="40" left="40" laneChangedFrom="1" laneChangedTo="1" flow="73.33"/>
+        <edge id="-178028204#9" sampledSeconds="1421.62" traveltime="15.39" overlapTraveltime="16.28" density="10.52" overlapDensity="11.11" laneDensity="5.26" occupancy="0.86" waitingTime="163.00" timeLoss="387.33" speed="3.95" speedRelative="0.47" departed="0" arrived="11" entered="89" left="76" laneChangedFrom="18" laneChangedTo="18" flow="149.67"/>
+        <edge id="-147053824#2" sampledSeconds="1186.48" traveltime="20.13" overlapTraveltime="20.46" density="5.69" overlapDensity="5.78" laneDensity="2.85" occupancy="0.46" waitingTime="0.00" timeLoss="94.34" speed="4.99" speedRelative="0.36" departed="0" arrived="0" entered="58" left="58" laneChangedFrom="0" laneChangedTo="0" flow="102.34"/>
+        <edge id="147053824#2" sampledSeconds="320.78" traveltime="18.55" overlapTraveltime="18.87" density="1.54" overlapDensity="1.56" laneDensity="0.77" occupancy="0.12" waitingTime="0.00" timeLoss="17.46" speed="5.41" speedRelative="0.39" departed="0" arrived="0" entered="17" left="17" laneChangedFrom="6" laneChangedTo="6" flow="29.97"/>
+    </interval>
+</meandata>
