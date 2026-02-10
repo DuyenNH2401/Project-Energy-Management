@@ -11,6 +11,10 @@
     <output>
         <tripinfo-output value="tripinfos.xml"/>
     </output>
+    
+    <time>
+        <step-length value="0.1"/>
+    </time>
 
     <report>
         <log value="sumo_log.txt"/>

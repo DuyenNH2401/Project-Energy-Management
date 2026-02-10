@@ -1,18 +1,20 @@
-Loading net-file from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_buslanes.net.xml' ... done (17ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_vtypes.add.xml' ... done (3ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_bus_stops.add.xml' ... done (0ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_busses.rou.xml' ... done (7ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_detectors.add.xml' ... done (1ms).
-Loading additional-files from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio_tls.add.xml' ... done (1ms).
-Loading route-files incrementally from '/home/ducanh/My_SUMO/maps/Project-Energy-Management/map_training/map2/pasubio.rou.xml'
+Loading net-file from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_buslanes.net.xml' ... done (17ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_vtypes.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_bus_stops.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_busses.rou.xml' ... done (7ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_detectors.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio.rou.xml'
 Loading done.
 Simulation started with time: 0.00.
-Simulation ended at time: 260.00.
+Warning: Vehicle 'Pertini_30_65' performs emergency braking on lane ':9_15_0' with decel=9.00, wished=4.50, severity=1.00, time=427.00.
+Simulation ended at time: 667.30.
 Performance:
- Duration: 16.12s
- Real time factor: 16.125
- UPS: 4411.126271
+ Duration: 20.74s
+ Real time factor: 32.1823
+ UPS: 126575.210996
 Vehicles:
- Inserted: 642 (Loaded: 1081)
- Running: 431
+ Inserted: 1632 (Loaded: 2053)
+ Running: 494
  Waiting: 0
+ Emergency Braking: 1
