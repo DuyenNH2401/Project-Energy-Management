@@ -21,6 +21,10 @@
         <time-to-teleport.bidi value="70"/>
     </processing>
 
+    <time>
+        <step-length value="0.5"/>
+    </time>
+    
     <report>
         <duration-log.statistics value="true"/>
     </report>

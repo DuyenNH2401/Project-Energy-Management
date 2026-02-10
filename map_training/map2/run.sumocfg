@@ -13,7 +13,7 @@
     </output>
     
     <time>
-        <step-length value="0.1"/>
+        <step-length value="0.5"/>
     </time>
 
     <report>

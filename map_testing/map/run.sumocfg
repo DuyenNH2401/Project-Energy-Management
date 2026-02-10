@@ -12,6 +12,10 @@
         <begin value="000"/>
         <end value="1200"/>
     </time>
+    
+    <time>
+        <step-length value="0.5"/>
+    </time>
 
     <report>
         <verbose value="true"/>
