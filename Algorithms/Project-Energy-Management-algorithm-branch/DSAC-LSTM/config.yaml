@@ -1,0 +1,45 @@
+# DSAC-LSTM Configuration
+# Tham số mặc định cho training
+
+# Environment
+env: "Pendulum-v1"
+seed: 0
+
+# Training
+total_steps: 100000
+batch_size: 32
+start_steps: 5000        # Random exploration steps
+update_after: 1000       # Steps before training starts
+update_every: 50         # Steps between updates
+gradient_steps: 50       # Gradient updates per training step
+
+# Algorithm
+gamma: 0.99              # Discount factor
+tau: 0.005               # Soft update coefficient
+auto_alpha: true         # Automatic temperature adjustment
+alpha: 0.2               # Initial/fixed temperature
+
+# Network Architecture
+hidden_dim: 256          # MLP hidden dimension
+lstm_hidden_dim: 128     # LSTM hidden dimension
+lstm_layers: 1           # Number of LSTM layers
+
+# Recurrent Training
+sequence_length: 64      # Length of sequences for training
+burn_in_steps: 16        # Steps to skip for loss (burn-in)
+
+# Replay Buffer
+buffer_size: 100000        # Maximum episodes to store
+
+# Learning Rates
+policy_lr: 0.0003
+value_lr: 0.0003
+alpha_lr: 0.0003
+
+# Logging
+log_interval: 1000       # Log metrics every N steps
+save_interval: 10000     # Save checkpoint every N steps
+save_dir: "checkpoints"
+
+# Device
+device: "auto"           # "cpu", "cuda", or "auto"

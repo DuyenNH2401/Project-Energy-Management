@@ -1,0 +1,45 @@
+# PASACLag Configuration
+# Hyperparameters for Parameterized Soft Actor-Critic with Lagrangian Constraints
+
+# Environment
+environment:
+  state_dim: 10           # Dimension of state space (velocity, acceleration, SOC, etc.)
+  continuous_dim: 1       # Number of continuous actions (e.g., engine torque)
+  discrete_dims: [4, 2]   # Discrete action dimensions (e.g., gear shift: 4, clutch: 2)
+
+# Training
+training:
+  max_episodes: 1000
+  max_steps: 500
+  batch_size: 256
+  buffer_size: 100000
+  warmup_steps: 1000      # Steps before training starts
+  update_frequency: 1     # Update every N steps
+  eval_frequency: 50      # Evaluate every N episodes
+  save_frequency: 100     # Save model every N episodes
+
+# Agent Hyperparameters
+agent:
+  gamma: 0.99             # Discount factor
+  tau: 0.005              # Soft update coefficient
+  alpha: 0.2              # Initial entropy temperature
+  auto_alpha: true        # Automatically tune alpha
+  cost_limit: 25.0        # Safety constraint limit (epsilon)
+  
+  # Learning rates
+  actor_lr: 0.0003
+  critic_lr: 0.0003
+  cost_critic_lr: 0.0003
+  lambda_lr: 0.0003
+  alpha_lr: 0.0003
+  
+  # Network architecture
+  hidden_dim: 256
+  
+  # Gumbel-Softmax temperature for discrete actions
+  gumbel_temperature: 1.0
+
+# Paths
+paths:
+  log_dir: "./logs/pasac_lag"
+  model_dir: "./checkpoints/pasac_lag"

@@ -1,0 +1,23 @@
+Loading net-file from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_buslanes.net.xml' ... done (13ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_vtypes.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_detectors.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_bus_stops.add.xml' ... done (0ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta.rou.xml'
+Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_busses.rou.xml'
+Loading done.
+Simulation started with time: 0.00.
+Warning: Vehicle 'Costa_11_51' performs emergency braking on lane '56b_0' with decel=9.00, wished=4.50, severity=1.00, time=177.20.
+Warning: Vehicle 'Vittorio_Veneto_3_7' performs emergency braking on lane ':20a_1_0' with decel=9.00, wished=4.50, severity=1.00, time=184.20.
+Warning: Vehicle 'Togliatti_3_115' performs emergency braking on lane ':20a_1_0' with decel=9.00, wished=4.50, severity=1.00, time=263.10.
+Warning: Vehicle 'Turati_10_10' performs emergency braking on lane ':50_1_0' with decel=9.00, wished=4.50, severity=1.00, time=374.50.
+Simulation ended at time: 385.00.
+Performance:
+ Duration: 27.16s
+ Real time factor: 14.1768
+ UPS: 48886.327650
+Vehicles:
+ Inserted: 926 (Loaded: 976)
+ Running: 499
+ Waiting: 2
+ Emergency Braking: 4

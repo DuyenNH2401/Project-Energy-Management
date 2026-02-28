@@ -1,0 +1,18 @@
+Loading net-file from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_buslanes.net.xml' ... done (16ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_vtypes.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_bus_stops.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_busses.rou.xml' ... done (8ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_detectors.add.xml' ... done (1ms).
+Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio.rou.xml'
+Loading done.
+Simulation started with time: 0.00.
+Simulation ended at time: 737.00.
+Performance:
+ Duration: 5.37s
+ Real time factor: 137.372
+ UPS: 114226.840634
+Vehicles:
+ Inserted: 1800 (Loaded: 2053)
+ Running: 502
+ Waiting: 0
