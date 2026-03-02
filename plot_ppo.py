@@ -1,9 +1,10 @@
+#Điền model và chạy file này để plot ra đồ hình
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_7_duong_nhieu'):
+def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_1_multi4_ppo_500'):
     # 1. Tạo thư mục nếu chưa tồn tại
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -70,4 +71,4 @@ def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_7_duon
         print(f"Đã lưu đồ thị: {file_name}")
 
 
-plot_tianshou_metrics('reports/tianshou_ppo/training_log_11022026_194632.csv')
+plot_tianshou_metrics('reports/tianshou_ppo/training_log_multi01032026_161724.csv')
