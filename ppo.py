@@ -16,7 +16,7 @@ from tianshou.trainer import OnpolicyTrainer
 
 # Import the provided SUMO environment
 try:
-    from simulation.continuous_sumo_env_tum_lum import SumoEnv
+    from simulation.continuous_sumo_env import SumoEnv
 except ImportError:
     from continuous_sumo_env import SumoEnv
 

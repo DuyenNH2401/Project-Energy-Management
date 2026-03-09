@@ -1,5 +1,6 @@
 #Đây là bản ban đầu
 import os
+import math
 import time
 import csv
 import torch
@@ -17,11 +18,9 @@ from tianshou.utils.net.continuous import ActorProb, Critic
 from tianshou.trainer import OnpolicyTrainer
 
 # Import the provided SUMO environment
-try:
-    from simulation.continuous_sumo_env_tum_lum import SumoEnv
-except ImportError:
-    # Fallback if running directly from simulation folder
-    from continuous_sumo_env import SumoEnv
+
+from simulation.env_random import SumoEnv
+
 
 # --- ADD THIS CLASS AFTER IMPORTS ---
 class SilentLogger:
@@ -48,7 +47,7 @@ class SilentLogger:
 # --- CONFIGURATION ---
 # UPDATE THESE PATHS TO MATCH YOUR ACTUAL FILES
 MAP_CONFIGS = [
-    "maps/map1/run.sumocfg"
+    "maps/map_grid_tuned/run.sumocfg"
 ]
 
 LOG_DIR = "reports/tianshou_ppo/"
@@ -65,14 +64,16 @@ CSV_HEADER = ["episode", "steps", "ep_reward", "avg_speed", "total_energy", "wig
 LR = 3e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
-MAX_GRAD_NORM = 0.5
+MAX_GRAD_NORM = 0.3
 VF_COEF = 0.25
 ENT_COEF = 0.01
-STEP_PER_EPOCH = 2048
+
+TOTAL_TIMESTEPS = 2000000
+STEP_PER_EPOCH = 4096
 REPEAT_PER_COLLECT = 10
-BATCH_SIZE = 64
-EPOCH = 500
-BUFFER_SIZE = 4096
+BATCH_SIZE = 128
+EPOCH = int(np.ceil(TOTAL_TIMESTEPS / STEP_PER_EPOCH))
+BUFFER_SIZE = 8192
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # --- HELPER: INIT LOG FILE ---
@@ -200,7 +201,7 @@ def train_ppo():
     state_shape = train_envs.observation_space[0].shape
     action_shape = train_envs.action_space[0].shape
     
-    net = Net(state_shape, hidden_sizes=[128, 128], device=DEVICE)
+    net = Net(state_shape, hidden_sizes=[256, 256], device=DEVICE)
     actor = ActorProb(net, action_shape, device=DEVICE, unbounded=True).to(DEVICE)
     critic = Critic(net, device=DEVICE).to(DEVICE)
     
