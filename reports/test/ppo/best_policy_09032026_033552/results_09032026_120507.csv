@@ -1,0 +1,2 @@
+episode,steps,ep_reward,avg_speed,total_energy,avg_wiggle,avg_safety,success,reason
+1,971,-47.22,4.80,561.61,0.0000,0.0469,1,goal

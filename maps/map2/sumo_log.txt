@@ -1,18 +1,22 @@
-Loading net-file from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_buslanes.net.xml' ... done (16ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_vtypes.add.xml' ... done (1ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_bus_stops.add.xml' ... done (1ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_busses.rou.xml' ... done (8ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_detectors.add.xml' ... done (1ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio_tls.add.xml' ... done (1ms).
-Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map2/pasubio.rou.xml'
+***Starting server on port 42273 ***
+Loading net-file from 'maps/map2/pasubio_buslanes.net.xml' ... done (17ms).
+Loading additional-files from 'maps/map2/pasubio_vtypes.add.xml' ... done (3ms).
+Loading additional-files from 'maps/map2/pasubio_bus_stops.add.xml' ... done (1ms).
+Loading additional-files from 'maps/map2/pasubio_busses.rou.xml' ... done (11ms).
+Loading additional-files from 'maps/map2/pasubio_detectors.add.xml' ... done (4ms).
+Loading additional-files from 'maps/map2/pasubio_tls.add.xml' ... done (2ms).
+Loading route-files incrementally from 'maps/map2/pasubio.rou.xml'
 Loading done.
 Simulation started with time: 0.00.
-Simulation ended at time: 737.00.
+Simulation ended at time: 207.00.
+Reason: TraCI requested termination.
 Performance:
- Duration: 5.37s
- Real time factor: 137.372
- UPS: 114226.840634
+ Duration: 0.86s
+ TraCI-Duration: 0.07s
+ Real time factor: 241.822
+ UPS: 111422.897196
 Vehicles:
- Inserted: 1800 (Loaded: 2053)
- Running: 502
+ Inserted: 512 (Loaded: 1081)
+ Running: 414
  Waiting: 0
+ Teleports: 0 (Collisions: 2)

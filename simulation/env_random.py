@@ -29,7 +29,7 @@ class SumoEnv(gym.Env):
         self.test_route = test_route
         self.delay = delay
         self.step_count = 0
-        self.MAX_EPISODE_STEPS = 1000
+        self.MAX_EPISODE_STEPS = 1001
         
         # --- CONSTANTS ---
         self.MAX_SPEED = 55.6
@@ -232,11 +232,11 @@ class SumoEnv(gym.Env):
         # Hàm này vẫn cần gọi API vì logic phức tạp và không thay đổi thường xuyên trong 1 step
         # Nhưng ta có thể dùng cache["road_id"] và cache["lane_pos"] để tối ưu 1 phần
         try:
-            if not self.veh_data: return 1000.0
+            if not self.veh_data: return 2000.0
             current_edge = self.veh_data["road_id"] # Dùng Cache
             
             if current_edge.startswith(":"):
-                return self.last_known_dist if self.last_known_dist else 1000.0
+                return self.last_known_dist if self.last_known_dist else 2000.0
 
             if hasattr(self, "current_route_edges") and current_edge in self.current_route_edges:
                 indices = [i for i, x in enumerate(self.current_route_edges) if x == current_edge]
@@ -249,9 +249,9 @@ class SumoEnv(gym.Env):
                 dist -= self.veh_data["lane_pos"] # Dùng Cache
                 self.last_known_dist = dist
                 return dist
-            return 1000.0
+            return 2000.0
         except:
-            return 1000.0
+            return 2000.0
 
     def _calculate_reward(self, action):
         if not self.veh_data: return 0.0
@@ -408,19 +408,31 @@ class SumoEnv(gym.Env):
                 
                 curr_edge_id = start_edge
                 dead_end = False
-                while current_len < 1000.0:
+                while current_len < 2000.0:
+                    # Query ALL lanes of the current edge so that left turns
+                    # and U-turns (which are only reachable from higher-index
+                    # lanes) are included alongside straight/right-turn links.
                     try:
-                        links = traci.lane.getLinks(f"{curr_edge_id}_0")
+                        num_lanes = traci.edge.getLaneNumber(curr_edge_id)
                     except:
                         dead_end = True
                         break
                     valid_next_edges = []
-                    for link in links:
-                        next_lane_id = link[0]
-                        next_edge_id = traci.lane.getEdgeID(next_lane_id)
-                        if not next_edge_id.startswith(":") and next_edge_id in self.drivable_edges:
-                            if len(route_edges) > 1 and next_edge_id == route_edges[-2]: continue 
-                            valid_next_edges.append(next_edge_id)
+                    for lane_idx in range(num_lanes):
+                        try:
+                            links = traci.lane.getLinks(f"{curr_edge_id}_{lane_idx}")
+                        except:
+                            continue
+                        for link in links:
+                            next_lane_id = link[0]
+                            try:
+                                next_edge_id = traci.lane.getEdgeID(next_lane_id)
+                            except:
+                                continue
+                            if not next_edge_id.startswith(":") and next_edge_id in self.drivable_edges:
+                                if len(route_edges) > 1 and next_edge_id == route_edges[-2]: continue
+                                if next_edge_id not in valid_next_edges:
+                                    valid_next_edges.append(next_edge_id)
                     if not valid_next_edges:
                         dead_end = True
                         break
@@ -430,7 +442,7 @@ class SumoEnv(gym.Env):
                     except: pass
                     curr_edge_id = next_edge
                 
-                if not dead_end and current_len >= 1000.0:
+                if not dead_end and current_len >= 2000.0:
                     try:
                         route_id = f"route_{random.randint(0, 999999)}"
                         traci.route.add(route_id, route_edges)
@@ -461,7 +473,7 @@ class SumoEnv(gym.Env):
         if self.render_mode and spawned:
             if self.VEH_ID in traci.vehicle.getIDList():
                 traci.gui.trackVehicle("View #0", self.VEH_ID)
-                traci.gui.setZoom("View #0", 1000)
+                traci.gui.setZoom("View #0", 1001)
 
         self.stuck_time = 0
         # --- CẬP NHẬT CACHE LẦN ĐẦU ---

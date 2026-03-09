@@ -1,23 +1,36 @@
-Loading net-file from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_buslanes.net.xml' ... done (13ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_vtypes.add.xml' ... done (0ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_detectors.add.xml' ... done (1ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_bus_stops.add.xml' ... done (0ms).
-Loading additional-files from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_tls.add.xml' ... done (1ms).
-Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta.rou.xml'
-Loading route-files incrementally from '/home/ducanh/My_SUMO/SUMO_Gym-like_ENV/maps/map3/acosta_busses.rou.xml'
+***Starting server on port 33803 ***
+Loading net-file from 'maps/map3/acosta_buslanes.net.xml' ... done (21ms).
+Loading additional-files from 'maps/map3/acosta_vtypes.add.xml' ... done (2ms).
+Loading additional-files from 'maps/map3/acosta_detectors.add.xml' ... done (3ms).
+Loading additional-files from 'maps/map3/acosta_bus_stops.add.xml' ... done (2ms).
+Loading additional-files from 'maps/map3/acosta_tls.add.xml' ... done (3ms).
+Loading route-files incrementally from 'maps/map3/acosta.rou.xml'
+Loading route-files incrementally from 'maps/map3/acosta_busses.rou.xml'
 Loading done.
 Simulation started with time: 0.00.
-Warning: Vehicle 'Costa_11_51' performs emergency braking on lane '56b_0' with decel=9.00, wished=4.50, severity=1.00, time=177.20.
-Warning: Vehicle 'Vittorio_Veneto_3_7' performs emergency braking on lane ':20a_1_0' with decel=9.00, wished=4.50, severity=1.00, time=184.20.
-Warning: Vehicle 'Togliatti_3_115' performs emergency braking on lane ':20a_1_0' with decel=9.00, wished=4.50, severity=1.00, time=263.10.
-Warning: Vehicle 'Turati_10_10' performs emergency braking on lane ':50_1_0' with decel=9.00, wished=4.50, severity=1.00, time=374.50.
-Simulation ended at time: 385.00.
+Error: Answered with error to command 0xa3: Lane '1[1]_0' is not known
+Error: Answered with error to command 0xa3: Lane '5[1][0]+66_0' is not known
+Error: Answered with error to command 0xa3: Lane '2[1][0]_0' is not known
+Error: Answered with error to command 0xa3: Lane '34[1][1]_0' is not known
+Error: Answered with error to command 0xa3: Lane '26.-170_0' is not known
+Error: Answered with error to command 0xa3: Lane '26.-170_0' is not known
+Error: Answered with error to command 0xa3: Lane '16[1]_0' is not known
+Error: Answered with error to command 0xa3: Lane '76_0' is not known
+Error: Answered with error to command 0xa3: Lane '52_0' is not known
+Error: Answered with error to command 0xa3: Lane '5[1][1][1]_0' is not known
+Error: Answered with error to command 0xa3: Lane '56[1][0]_0' is not known
+Error: Answered with error to command 0xa3: Lane '29[0]_0' is not known
+Error: Answered with error to command 0xa3: Lane '11[0]_0' is not known
+Error: Answered with error to command 0xa3: Lane '38[0]_0' is not known
+Error: Answered with error to command 0xa3: Lane '3[1]b_0' is not known
+Simulation ended at time: 186.00.
+Reason: TraCI requested termination.
 Performance:
- Duration: 27.16s
- Real time factor: 14.1768
- UPS: 48886.327650
+ Duration: 0.83s
+ TraCI-Duration: 0.05s
+ Real time factor: 224.096
+ UPS: 97733.734940
 Vehicles:
- Inserted: 926 (Loaded: 976)
- Running: 499
- Waiting: 2
- Emergency Braking: 4
+ Inserted: 452 (Loaded: 502)
+ Running: 382
+ Waiting: 6
