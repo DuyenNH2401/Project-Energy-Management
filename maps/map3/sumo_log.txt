@@ -1,0 +1,23 @@
+***Starting server on port 55670 ***
+Loading net-file from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_buslanes.net.xml' ... done (40ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_vtypes.add.xml' ... done (1ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_detectors.add.xml' ... done (1ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_bus_stops.add.xml' ... done (1ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta.rou.xml'
+Loading route-files incrementally from 'D:\Projects\Energymanagement\new_env\maps/map3/acosta_busses.rou.xml'
+Loading done.
+Simulation version 1.25.0 started with time: 0.00.
+Simulation ended at time: 115.00.
+Reason: TraCI requested termination.
+Performance:
+ Duration: 0.78s
+ TraCI-Duration: 0.08s
+ Real time factor: 148.196
+ UPS: 75230.670103
+Vehicles:
+ Inserted: 508 (Loaded: 1507)
+ Running: 503
+ Waiting: 339
+DijkstraRouter answered 2 queries and explored 44.50 edges on average.
+DijkstraRouter spent 0.00s answering queries (0.00ms on average).

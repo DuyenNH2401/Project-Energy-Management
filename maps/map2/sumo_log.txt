@@ -1,0 +1,22 @@
+***Starting server on port 54163 ***
+Loading net-file from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_buslanes.net.xml' ... done (32ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_vtypes.add.xml' ... done (2ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_bus_stops.add.xml' ... done (1ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_busses.rou.xml' ... done (20ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_detectors.add.xml' ... done (2ms).
+Loading additional-files from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio_tls.add.xml' ... done (1ms).
+Loading route-files incrementally from 'D:\Projects\Energymanagement\new_env\maps/map2/pasubio.rou.xml'
+Loading done.
+Simulation started with time: 0.00.
+Simulation ended at time: 116.00.
+Reason: TraCI requested termination.
+Performance:
+ Duration: 4.03s
+ TraCI-Duration: 0.29s
+ Real time factor: 28.7556
+ UPS: 8463.559742
+Vehicles:
+ Inserted: 291 (Loaded: 602)
+ Running: 265
+ Waiting: 0
+ Teleports: 0 (Collisions: 1)

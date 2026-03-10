@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file value="map_grid.net.xml"/>
+        <route-files value="map_grid.rou.xml"/>
+    </input>
+    <processing>
+        <collision.action value="remove"/>
+        <time-to-teleport value="-1"/>
+    </processing>
+</configuration>

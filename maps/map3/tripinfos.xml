@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-02-11T20:46:22.587172+07:00 by Eclipse SUMO sumo 1.25.0
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="D:\Projects\Energymanagement\new_env\maps/map3/acosta_buslanes.net.xml"/>
+        <route-files value="D:\Projects\Energymanagement\new_env\maps/map3/acosta.rou.xml,D:\Projects\Energymanagement\new_env\maps/map3/acosta_busses.rou.xml"/>
+        <additional-files value="D:\Projects\Energymanagement\new_env\maps/map3/acosta_vtypes.add.xml,D:\Projects\Energymanagement\new_env\maps/map3/acosta_detectors.add.xml,D:\Projects\Energymanagement\new_env\maps/map3/acosta_bus_stops.add.xml,D:\Projects\Energymanagement\new_env\maps/map3/acosta_tls.add.xml"/>
+    </input>
+
+    <output>
+        <tripinfo-output value="D:\Projects\Energymanagement\new_env\maps/map3/tripinfos.xml"/>
+    </output>
+
+    <time>
+        <step-length value="0.5"/>
+    </time>
+
+    <processing>
+        <scale value="3.0"/>
+    </processing>
+
+    <report>
+        <no-warnings value="true"/>
+        <log value="D:\Projects\Energymanagement\new_env\maps/map3/sumo_log.txt"/>
+        <no-step-log value="true"/>
+    </report>
+
+    <emissions>
+        <device.emissions.probability value="1.0"/>
+    </emissions>
+
+    <traci_server>
+        <remote-port value="55670"/>
+    </traci_server>
+
+    <gui_only>
+        <gui-settings-file value="D:\Projects\Energymanagement\new_env\maps/map3/settings.gui.xml"/>
+        <quit-on-end value="true"/>
+        <start value="true"/>
+        <delay value="20"/>
+    </gui_only>
+
+</sumoConfiguration>
+-->
+
+<tripinfos xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/tripinfo_file.xsd">
+    <tripinfo id="Silvani_11_0" depart="0.00" departLane="203[0]_0" departPos="0.00" departSpeed="0.00" departDelay="0.00" arrival="79.00" arrivalLane="114_0" arrivalPos="692.70" arrivalSpeed="14.64" duration="79.00" routeLength="1114.25" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="5.21" rerouteNo="0" devices="tripinfo_Silvani_11_0 emissions_Silvani_11_0" vType="passenger3" speedFactor="1.09" vaporized="">
+        <emissions CO_abs="1248.11" CO2_abs="185023.89" HC_abs="42.74" PMx_abs="15.83" NOx_abs="349.73" fuel_abs="58275.35" electricity_abs="0.00"/>
+    </tripinfo>
+    <tripinfo id="Pepoli_8_16" depart="32.00" departLane="210_0" departPos="0.00" departSpeed="0.00" departDelay="5.00" arrival="89.50" arrivalLane="134b_0" arrivalPos="156.17" arrivalSpeed="14.77" duration="57.50" routeLength="692.71" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="11.55" rerouteNo="0" devices="tripinfo_Pepoli_8_16 emissions_Pepoli_8_16" vType="passenger2a" speedFactor="1.11" vaporized="">
+        <emissions CO_abs="1395.84" CO2_abs="140418.80" HC_abs="38.34" PMx_abs="14.38" NOx_abs="279.81" fuel_abs="44226.44" electricity_abs="0.00"/>
+    </tripinfo>
+    <tripinfo id="Pepoli_8_16.1" depart="34.00" departLane="210_0" departPos="0.00" departSpeed="0.00" departDelay="7.00" arrival="99.50" arrivalLane="134b_0" arrivalPos="156.17" arrivalSpeed="11.57" duration="65.50" routeLength="692.71" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="5.67" rerouteNo="0" devices="tripinfo_Pepoli_8_16.1 emissions_Pepoli_8_16.1" vType="passenger3" speedFactor="0.85" vaporized="">
+        <emissions CO_abs="912.93" CO2_abs="121241.61" HC_abs="31.07" PMx_abs="10.79" NOx_abs="229.26" fuel_abs="38186.37" electricity_abs="0.00"/>
+    </tripinfo>
+    <tripinfo id="Pepoli_8_16.2" depart="36.50" departLane="210_0" departPos="0.00" departSpeed="0.00" departDelay="9.50" arrival="101.00" arrivalLane="134b_0" arrivalPos="156.17" arrivalSpeed="13.65" duration="64.50" routeLength="692.71" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="15.51" rerouteNo="0" devices="tripinfo_Pepoli_8_16.2 emissions_Pepoli_8_16.2" vType="passenger5" speedFactor="1.04" vaporized="">
+        <emissions CO_abs="1078.42" CO2_abs="127483.07" HC_abs="33.74" PMx_abs="11.71" NOx_abs="245.05" fuel_abs="40152.19" electricity_abs="0.00"/>
+    </tripinfo>
+    <tripinfo id="Costa_12_0" depart="0.00" departLane="78[0]_0" departPos="0.00" departSpeed="0.00" departDelay="0.00" arrival="113.00" arrivalLane="136_0" arrivalPos="186.20" arrivalSpeed="14.26" duration="113.00" routeLength="1416.38" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="13.29" rerouteNo="0" devices="tripinfo_Costa_12_0 emissions_Costa_12_0" vType="passenger2a" speedFactor="1.05" vaporized="">
+        <emissions CO_abs="3288.19" CO2_abs="297241.05" HC_abs="83.82" PMx_abs="32.24" NOx_abs="606.34" fuel_abs="93619.34" electricity_abs="0.00"/>
+    </tripinfo>
+</tripinfos>
