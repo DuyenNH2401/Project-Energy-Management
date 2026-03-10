@@ -232,11 +232,11 @@ class SumoEnv(gym.Env):
         # Hàm này vẫn cần gọi API vì logic phức tạp và không thay đổi thường xuyên trong 1 step
         # Nhưng ta có thể dùng cache["road_id"] và cache["lane_pos"] để tối ưu 1 phần
         try:
-            if not self.veh_data: return 2000.0
+            if not self.veh_data: return 1100.0
             current_edge = self.veh_data["road_id"] # Dùng Cache
             
             if current_edge.startswith(":"):
-                return self.last_known_dist if self.last_known_dist else 2000.0
+                return self.last_known_dist if self.last_known_dist else 1100.0
 
             if hasattr(self, "current_route_edges") and current_edge in self.current_route_edges:
                 indices = [i for i, x in enumerate(self.current_route_edges) if x == current_edge]
@@ -249,20 +249,20 @@ class SumoEnv(gym.Env):
                 dist -= self.veh_data["lane_pos"] # Dùng Cache
                 self.last_known_dist = dist
                 return dist
-            return 2000.0
+            return 1100.0
         except:
-            return 2000.0
+            return 1100.0
 
     def _calculate_reward(self, action):
         if not self.veh_data: return 0.0
         d = self.veh_data # Dùng Cache
 
-        W_SPEED = 1.2
-        W_PROGRESS = 0.8
+        W_SPEED = 1.2 #chinh len 1.3
+        W_PROGRESS = 0.8 #chinh len 0.9
         W_ENERGY = -0.05
         W_COMFORT = -0.05
         W_SAFETY = -0.8
-        W_TIME = -0.2
+        W_TIME = -0.2 #chinh len -0.3
 
         dist = self._get_dist_to_destination()
         if not hasattr(self, "prev_dist"): self.prev_dist = dist
@@ -393,13 +393,15 @@ class SumoEnv(gym.Env):
                     spawned = True
                     break
         else:
-            if not hasattr(self, 'drivable_edges') or not self.drivable_edges:
-                self.drivable_edges = self._get_passenger_edges()
+            # FIX 1: Always recompute drivable_edges for the current SUMO session.
+            # Caching across sessions causes stale edge IDs when maps rotate.
+            self.drivable_edges = self._get_passenger_edges()
 
             for attempt in range(20):
                 if not self.drivable_edges: break
                 start_edge = random.choice(self.drivable_edges)
                 route_edges = [start_edge]
+                visited_edges = {start_edge}  # FIX 2: track all visited edges to prevent cycles
                 current_len = 0.0
                 try:
                     current_len += traci.lane.getLength(f"{start_edge}_0")
@@ -408,10 +410,10 @@ class SumoEnv(gym.Env):
                 
                 curr_edge_id = start_edge
                 dead_end = False
-                while current_len < 2000.0:
-                    # Query ALL lanes of the current edge so that left turns
-                    # and U-turns (which are only reachable from higher-index
-                    # lanes) are included alongside straight/right-turn links.
+                while current_len < 1100.0:
+                    # FIX 3: Query ALL lanes of the current edge so that left turns
+                    # and U-turns (only reachable from higher-index lanes) are
+                    # included alongside straight/right-turn links.
                     try:
                         num_lanes = traci.edge.getLaneNumber(curr_edge_id)
                     except:
@@ -429,20 +431,22 @@ class SumoEnv(gym.Env):
                                 next_edge_id = traci.lane.getEdgeID(next_lane_id)
                             except:
                                 continue
-                            if not next_edge_id.startswith(":") and next_edge_id in self.drivable_edges:
-                                if len(route_edges) > 1 and next_edge_id == route_edges[-2]: continue
-                                if next_edge_id not in valid_next_edges:
-                                    valid_next_edges.append(next_edge_id)
+                            if (not next_edge_id.startswith(":")
+                                    and next_edge_id in self.drivable_edges
+                                    and next_edge_id not in visited_edges  # no cycles
+                                    and next_edge_id not in valid_next_edges):
+                                valid_next_edges.append(next_edge_id)
                     if not valid_next_edges:
                         dead_end = True
                         break
                     next_edge = random.choice(valid_next_edges)
                     route_edges.append(next_edge)
+                    visited_edges.add(next_edge)
                     try: current_len += traci.lane.getLength(f"{next_edge}_0")
                     except: pass
                     curr_edge_id = next_edge
                 
-                if not dead_end and current_len >= 2000.0:
+                if not dead_end and current_len >= 1100.0:
                     try:
                         route_id = f"route_{random.randint(0, 999999)}"
                         traci.route.add(route_id, route_edges)
