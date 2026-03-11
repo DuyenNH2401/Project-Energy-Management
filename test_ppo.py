@@ -31,16 +31,18 @@ from tianshou.policy import PPOPolicy
 
 # ── Local env ─────────────────────────────────────────────────────────────────
 from simulation.env_random import SumoEnv
-
+#dang test env cu
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIG  (mirrors ppo_ban_dau_random.py – must stay in sync)
 # ═══════════════════════════════════════════════════════════════════════════════
 MAP_CONFIGS = [
-    "maps/map_grid_tuned_no_car/run.sumocfg"
+    "maps/map_grid_tuned_no_car/run.sumocfg",
+    #"maps/map2/run.sumocfg"
+    #"maps/map3/run.sumocfg"
 ]
 
-DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Network hyper-params (must match training)
 HIDDEN_SIZES = [256, 256]

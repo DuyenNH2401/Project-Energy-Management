@@ -98,109 +98,6 @@ class SumoEnv(gym.Env):
                 continue
         return valid_edges
     
-    # ------------------------------------------------------------------ #
-    #  ROUTE-AWARE LANE GUIDANCE                                          #
-    # ------------------------------------------------------------------ #
-    def _get_turn_direction_numeric(self, from_edge: str, to_edge: str) -> float:
-        """
-        Tính hướng rẽ khi chuyển từ from_edge → to_edge.
-        Trả về giá trị liên tục trong [-1, +1]:
-          -1  = rẽ trái / U-turn
-           0  = đi thẳng
-          +1  = rẽ phải
-        """
-        import math
-        try:
-            def edge_heading(edge_id):
-                shape = traci.edge.getShape(edge_id)
-                if len(shape) < 2:
-                    return None
-                x1, y1 = shape[0]
-                x2, y2 = shape[-1]
-                return math.degrees(math.atan2(y2 - y1, x2 - x1))
-
-            a1 = edge_heading(from_edge)
-            a2 = edge_heading(to_edge)
-            if a1 is None or a2 is None:
-                return 0.0
-
-            diff = (a2 - a1 + 360) % 360   # [0, 360)
-            if diff > 180:
-                diff -= 360                  # [-180, 180)
-
-            # diff > 0 → trái (góc dương trong hệ SUMO)
-            # diff < 0 → phải
-            # Chuẩn hoá về [-1, +1]: đổi dấu để +1 = phải, -1 = trái
-            return float(np.clip(-diff / 180.0, -1.0, 1.0))
-        except Exception:
-            return 0.0
-
-    def _get_next_turn_info(self) -> tuple:
-        """
-        Nhìn trước trong current_route_edges để tìm khúc rẽ tiếp theo.
-
-        Trả về (turn_dir, turn_dist_norm, lane_offset):
-          turn_dir      : hướng rẽ [-1=trái … +1=phải]  (0 = thẳng / chưa biết)
-          turn_dist_norm: khoảng cách chuẩn hoá đến cuối edge hiện tại [0, 1]
-          lane_offset   : số làn cần dịch chuyển, chuẩn hoá [-1, +1]
-                          âm = cần dịch sang trái, dương = cần dịch sang phải
-        """
-        default = (0.0, 1.0, 0.0)
-        if not self.veh_data:
-            return default
-        try:
-            current_edge = self.veh_data["road_id"]
-            if current_edge.startswith(":"):
-                return default
-            if not hasattr(self, "current_route_edges") or not self.current_route_edges:
-                return default
-            if current_edge not in self.current_route_edges:
-                return default
-
-            # Vị trí trong route
-            indices = [i for i, x in enumerate(self.current_route_edges) if x == current_edge]
-            curr_idx = indices[-1]
-            if curr_idx >= len(self.current_route_edges) - 1:
-                return default   # đang ở edge cuối
-
-            next_edge = self.current_route_edges[curr_idx + 1]
-
-            # --- Hướng rẽ ---
-            turn_dir = self._get_turn_direction_numeric(current_edge, next_edge)
-
-            # --- Khoảng cách đến cuối edge hiện tại ---
-            lane_id = self.veh_data["lane_id"]
-            if not lane_id:
-                return (turn_dir, 1.0, 0.0)
-            lane_len  = traci.lane.getLength(lane_id)
-            dist_left = max(0.0, lane_len - self.veh_data["lane_pos"])
-            turn_dist_norm = float(np.clip(dist_left / self.MAX_DIST, 0.0, 1.0))
-
-            # --- Làn nào trên current_edge dẫn tới next_edge ---
-            num_lanes    = traci.edge.getLaneNumber(current_edge)
-            correct_lane = None
-            for li in range(num_lanes):
-                try:
-                    for link in traci.lane.getLinks(f"{current_edge}_{li}"):
-                        if traci.lane.getEdgeID(link[0]) == next_edge:
-                            correct_lane = li
-                            break
-                except Exception:
-                    continue
-                if correct_lane is not None:
-                    break
-
-            if correct_lane is None:
-                return (turn_dir, turn_dist_norm, 0.0)
-
-            # Offset chuẩn hoá: dương → cần sang phải, âm → cần sang trái
-            raw_offset   = correct_lane - self.veh_data["lane_idx"]
-            lane_offset  = float(np.clip(raw_offset / max(1, num_lanes - 1), -1.0, 1.0))
-
-            return (turn_dir, turn_dist_norm, lane_offset)
-        except Exception:
-            return default
-
     def _get_surroundings(self):
         # Lưu ý: getNeighbors vẫn phải gọi API riêng vì nó trả về danh sách phức tạp
         # Nhưng ta tận dụng self.veh_data["speed"] thay vì gọi lại getSpeed cho xe mình
@@ -293,26 +190,24 @@ class SumoEnv(gym.Env):
             # 4. INFRASTRUCTURE
             lane_id = d["lane_id"]
             speed_limit = traci.lane.getMaxSpeed(lane_id) / self.MAX_SPEED if lane_id else 1.0
-
+            can_left = 1.0 if lane_idx < (total_lanes - 1) else 0.0
+            can_right = 1.0 if lane_idx > 0 else 0.0
+            
             tls_data = d["tls"]
             if tls_data:
                 tls_dist = min(tls_data[0][2], self.MAX_DIST) / self.MAX_DIST
                 tls_state = 1.0 if tls_data[0][3].lower() == 'g' else 0.0
             else:
                 tls_dist, tls_state = 1.0, 1.0
-
-            # 5. ROUTE-AWARE LANE GUIDANCE
-            # Thay thế can_left/can_right/turn_dist bằng 3 tín hiệu hữu ích hơn:
-            #   turn_dir      – hướng rẽ tiếp theo (-1=trái … +1=phải)
-            #   turn_dist_n   – khoảng cách đến khúc rẽ (chuẩn hoá)
-            #   lane_offset   – số làn cần dịch để vào đúng vị trí (âm=trái, dương=phải)
-            turn_dir, turn_dist_n, lane_offset = self._get_next_turn_info()
+            
+            lane_len = traci.lane.getLength(lane_id) if lane_id else 100.0
+            turn_dist = min(lane_len - d["lane_pos"], self.MAX_DIST) / self.MAX_DIST
 
             # Tạo list trước
             obs_list = [
                 velocity, acceleration, elec, norm_lane, slope, lat_offset,
                 l_dist, l_rel_speed,
-                speed_limit, turn_dir, turn_dist_n, tls_dist, tls_state, lane_offset
+                speed_limit, can_left, can_right, tls_dist, tls_state, turn_dist
             ] + surroundings
 
             # --- SỬA LỖI OVERFLOW Ở ĐÂY ---
@@ -337,11 +232,11 @@ class SumoEnv(gym.Env):
         # Hàm này vẫn cần gọi API vì logic phức tạp và không thay đổi thường xuyên trong 1 step
         # Nhưng ta có thể dùng cache["road_id"] và cache["lane_pos"] để tối ưu 1 phần
         try:
-            if not self.veh_data: return 1000.0
+            if not self.veh_data: return 3000.0
             current_edge = self.veh_data["road_id"] # Dùng Cache
             
             if current_edge.startswith(":"):
-                return self.last_known_dist if self.last_known_dist else 1000.0
+                return self.last_known_dist if self.last_known_dist else 3000.0
 
             if hasattr(self, "current_route_edges") and current_edge in self.current_route_edges:
                 indices = [i for i, x in enumerate(self.current_route_edges) if x == current_edge]
@@ -354,75 +249,67 @@ class SumoEnv(gym.Env):
                 dist -= self.veh_data["lane_pos"] # Dùng Cache
                 self.last_known_dist = dist
                 return dist
-            return 1000.0
+            return 3000.0
         except:
-            return 1000.0
+            return 3000.0
 
     def _calculate_reward(self, action):
         if not self.veh_data: return 0.0
-        d = self.veh_data
+        d = self.veh_data # Dùng Cache
 
-        W_SPEED    =  1.2
-        W_PROGRESS =  0.8
-        W_ENERGY   = -0.05
-        W_COMFORT  = -0.05   # chỉ phạt jerk ga/phanh, KHÔNG phạt tay lái
-        W_SAFETY   = -0.8
-        W_TIME     = -0.2
-        W_LANE     = -0.6    # phạt sai làn khi sắp đến khúc rẽ
+        W_SPEED = 1.2 #chinh len 1.3
+        W_PROGRESS = 0.8 #chinh len 0.9
+        W_ENERGY = -0.05
+        W_COMFORT = -0.05
+        W_SAFETY = -0.8
+        W_TIME = -0.2 #chinh len -0.3
 
-        # --- Progress ---
         dist = self._get_dist_to_destination()
         if not hasattr(self, "prev_dist"): self.prev_dist = dist
-        progress_reward = np.clip(self.prev_dist - dist, -1.0, 1.0)
+        
+        progress_raw = self.prev_dist - dist
+        progress_reward = np.clip(progress_raw, -1.0, 1.0)
         self.prev_dist = dist
 
-        # --- Speed ---
+        # Dùng Cache cho Speed
         cur_speed = d["speed"]
         speed_reward = cur_speed / self.MAX_SPEED
         if cur_speed < 3.0:
             speed_reward -= 0.8
 
-        # --- Energy ---
-        energy_penalty = np.clip(d["elec"] / self.MAX_ELEC, 0.0, 1.0)
+        # Dùng Cache cho Elec
+        elec = d["elec"]
+        energy_penalty = np.clip(elec / self.MAX_ELEC, 0.0, 1.0)
 
-        # --- Comfort: CHỈ đo jerk của ga/phanh (action[1]), KHÔNG phạt tay lái (action[0]) ---
-        # Phạt tay lái khiến xe sợ chuyển làn. Jerk ga/phanh mới là comfort thực sự.
         if not hasattr(self, "prev_action"): self.prev_action = action
-        accel_jerk = float(np.abs(action[1] - self.prev_action[1]))
+        action_delta = np.abs(action - self.prev_action)
+        wiggle_penalty = np.mean(action_delta)
         self.prev_action = action
 
-        # --- Safety ---
         safety_penalty = 0.0
+        # Dùng Cache cho Leader
         leader = d["leader"]
+        
         if cur_speed <= 10.0: target_dist = 15.0
         elif cur_speed <= 20.0: target_dist = 30.0
         else: target_dist = 50.0
-        if leader is not None and leader[1] < target_dist:
-            safety_penalty = float(np.exp(-(leader[1] / target_dist)))
 
-        # --- Lane guidance ---
-        # Phạt khi đang ở sai làn và gần đến khúc rẽ:
-        #   urgency = 0 (xa) … 1 (sát khúc rẽ)
-        #   lane_offset ≠ 0 → đang ở sai làn
-        #   penalty = |lane_offset| × urgency  → càng gần rẽ, phạt càng nặng
-        _, turn_dist_n, lane_offset = self._get_next_turn_info()
-        urgency     = float(np.clip(1.0 - turn_dist_n, 0.0, 1.0))
-        lane_penalty = float(np.abs(lane_offset)) * urgency
+        if leader is not None:
+            leader_dist = leader[1]
+            if leader_dist < target_dist:
+                safety_penalty = np.exp(-(leader_dist / target_dist)) 
 
-        # --- Tổng hợp ---
-        speed_reward   = np.nan_to_num(speed_reward)
-        progress_reward= np.nan_to_num(progress_reward)
+        speed_reward = np.nan_to_num(speed_reward)
+        progress_reward = np.nan_to_num(progress_reward)
         energy_penalty = np.nan_to_num(energy_penalty)
-        accel_jerk     = np.nan_to_num(accel_jerk)
+        wiggle_penalty = np.nan_to_num(wiggle_penalty)
         safety_penalty = np.nan_to_num(safety_penalty)
-        lane_penalty   = np.nan_to_num(lane_penalty)
 
-        reward = (speed_reward    * W_SPEED)    + \
+        reward = (speed_reward * W_SPEED) + \
                  (progress_reward * W_PROGRESS) + \
-                 (accel_jerk      * W_COMFORT)  + \
-                 (safety_penalty  * W_SAFETY)   + \
-                 (energy_penalty  * W_ENERGY)   + \
-                 (lane_penalty    * W_LANE)     + \
+                 (wiggle_penalty * W_COMFORT) + \
+                 (safety_penalty * W_SAFETY) + \
+                 (energy_penalty * W_ENERGY) + \
                  W_TIME
         return reward
 
@@ -498,21 +385,23 @@ class SumoEnv(gym.Env):
             while self.VEH_ID not in traci.vehicle.getIDList():
                 traci.simulationStep()
             traci.vehicle.setType(self.VEH_ID, self.VTYPE_ID)
-            traci.vehicle.setSpeedMode(self.VEH_ID, 0)
-            traci.vehicle.setLaneChangeMode(self.VEH_ID, 0)
+            # traci.vehicle.setSpeedMode(self.VEH_ID, 0)
+            # traci.vehicle.setLaneChangeMode(self.VEH_ID, 0)
             for _ in range(50):
                 traci.simulationStep()
                 if self.VEH_ID in traci.vehicle.getIDList():
                     spawned = True
                     break
         else:
-            if not hasattr(self, 'drivable_edges') or not self.drivable_edges:
-                self.drivable_edges = self._get_passenger_edges()
+            # FIX 1: Always recompute drivable_edges for the current SUMO session.
+            # Caching across sessions causes stale edge IDs when maps rotate.
+            self.drivable_edges = self._get_passenger_edges()
 
             for attempt in range(20):
                 if not self.drivable_edges: break
                 start_edge = random.choice(self.drivable_edges)
                 route_edges = [start_edge]
+                visited_edges = {start_edge}  # FIX 2: track all visited edges to prevent cycles
                 current_len = 0.0
                 try:
                     current_len += traci.lane.getLength(f"{start_edge}_0")
@@ -521,32 +410,47 @@ class SumoEnv(gym.Env):
                 
                 curr_edge_id = start_edge
                 dead_end = False
-                while current_len < 1000.0:
+                while current_len < 3000.0:
+                    # FIX 3: Query ALL lanes of the current edge so that left turns
+                    # and U-turns (only reachable from higher-index lanes) are
+                    # included alongside straight/right-turn links.
                     try:
-                        links = traci.lane.getLinks(f"{curr_edge_id}_0")
+                        num_lanes = traci.edge.getLaneNumber(curr_edge_id)
                     except:
                         dead_end = True
                         break
                     valid_next_edges = []
-                    for link in links:
-                        next_lane_id = link[0]
-                        next_edge_id = traci.lane.getEdgeID(next_lane_id)
-                        if not next_edge_id.startswith(":") and next_edge_id in self.drivable_edges:
-                            if len(route_edges) > 1 and next_edge_id == route_edges[-2]: continue 
-                            valid_next_edges.append(next_edge_id)
+                    for lane_idx in range(num_lanes):
+                        try:
+                            links = traci.lane.getLinks(f"{curr_edge_id}_{lane_idx}")
+                        except:
+                            continue
+                        for link in links:
+                            next_lane_id = link[0]
+                            try:
+                                next_edge_id = traci.lane.getEdgeID(next_lane_id)
+                            except:
+                                continue
+                            if (not next_edge_id.startswith(":")
+                                    and next_edge_id in self.drivable_edges
+                                    and next_edge_id not in visited_edges  # no cycles
+                                    and next_edge_id not in valid_next_edges):
+                                valid_next_edges.append(next_edge_id)
                     if not valid_next_edges:
                         dead_end = True
                         break
                     next_edge = random.choice(valid_next_edges)
                     route_edges.append(next_edge)
+                    visited_edges.add(next_edge)
                     try: current_len += traci.lane.getLength(f"{next_edge}_0")
                     except: pass
                     curr_edge_id = next_edge
                 
-                if not dead_end and current_len >= 1000.0:
+                if not dead_end and current_len >= 3000.0:
                     try:
                         route_id = f"route_{random.randint(0, 999999)}"
                         traci.route.add(route_id, route_edges)
+                        print(f"Generated route: {route_edges}")
                         self.current_route_edges = route_edges
                         traci.vehicle.add(self.VEH_ID, route_id, departPos="free", typeID=self.VTYPE_ID)
                         for _ in range(50):
@@ -555,8 +459,8 @@ class SumoEnv(gym.Env):
                                 spawned = True
                                 break
                         if spawned:
-                            traci.vehicle.setSpeedMode(self.VEH_ID, 0)
-                            traci.vehicle.setLaneChangeMode(self.VEH_ID, 0)
+                            # traci.vehicle.setSpeedMode(self.VEH_ID, 0)
+                            # traci.vehicle.setLaneChangeMode(self.VEH_ID, 0)
                             self.last_known_dist = current_len
                             self.prev_dist = current_len
                             break 
@@ -677,8 +581,7 @@ class SumoEnv(gym.Env):
         
         if not hasattr(self, "prev_action"): self.prev_action = action
         action_delta = np.abs(action - self.prev_action)
-        # wiggle_stat: vẫn log cả 2 chiều để quan sát, nhưng reward chỉ dùng accel_jerk
-        wiggle_stat = float(action_delta[1])   # chỉ jerk của ga/phanh (giống reward)
+        wiggle_stat = np.mean(action_delta)
         self.prev_action = action
 
         if not terminated:

@@ -1,0 +1,5 @@
+episode,steps,ep_reward,avg_speed,total_energy,avg_wiggle,avg_safety,success,reason
+1,1001,-1219.61,1.03,422.79,0.0000,0.0000,0,timeout
+2,1001,-1182.80,1.40,643.04,0.0000,0.0000,0,timeout
+3,1001,-1216.60,0.97,447.88,0.0000,0.0000,0,timeout
+4,151,315.81,15.83,707.20,0.0000,0.0000,1,goal
