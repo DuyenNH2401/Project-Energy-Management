@@ -58,7 +58,7 @@ CSV_PATH = os.path.join(LOG_DIR, CSV_FILENAME)
 SEED = 42
 
 # Header requested by user
-CSV_HEADER = ["episode", "steps", "ep_reward", "avg_speed", "total_energy", "wiggle", "safety", "success", "reason"]
+CSV_HEADER = ["episode", "steps", "ep_reward", "avg_speed", "total_energy", "wiggle", "safety", "success", "reason", "route"]
 
 # Hyperparameters
 LR = 3e-4
@@ -66,7 +66,7 @@ GAMMA = 0.99
 GAE_LAMBDA = 0.95
 MAX_GRAD_NORM = 0.3
 VF_COEF = 0.25
-ENT_COEF = 0.01
+ENT_COEF = 0.05  # Tăng lên để khuyến khích agent thử nghiệm nhiều hành động hơn (exploration) thay vì hội tụ sớm
 
 TOTAL_TIMESTEPS = 2000000
 STEP_PER_EPOCH = 4096
@@ -150,6 +150,7 @@ class MetricsWrapper(gym.Wrapper):
             
             success = info.get("is_success", 0)
             reason = info.get("reason", "unknown")
+            route_str = info.get("route", "") if reason in ["stuck_too_long", "timeout", "teleport"] else ""
             
             # Prepare Row
             row = [
@@ -161,7 +162,8 @@ class MetricsWrapper(gym.Wrapper):
                 f"{avg_jerk:.4f}",
                 f"{avg_safety:.4f}",
                 success,
-                reason
+                reason,
+                route_str
             ]
             
             # Write to CSV immediately (Append mode)

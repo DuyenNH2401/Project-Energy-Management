@@ -37,7 +37,7 @@ from simulation.env_random import SumoEnv
 # CONFIG  (mirrors ppo_ban_dau_random.py – must stay in sync)
 # ═══════════════════════════════════════════════════════════════════════════════
 MAP_CONFIGS = [
-    "maps/map_grid_tuned_no_car/run.sumocfg",
+    "maps/map_grid_tuned/run.sumocfg",
     #"maps/map2/run.sumocfg"
     #"maps/map3/run.sumocfg"
 ]
