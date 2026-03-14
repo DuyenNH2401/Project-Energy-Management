@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_6_random'):
+def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_8_random'):
     # 1. Tạo thư mục nếu chưa tồn tại
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -71,4 +71,4 @@ def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_6_rand
         print(f"Đã lưu đồ thị: {file_name}")
 
 
-plot_tianshou_metrics('reports/tianshou_ppo/training_log_12032026_232128.csv')
+plot_tianshou_metrics('reports/tianshou_ppo/training_log_13032026_222442.csv')

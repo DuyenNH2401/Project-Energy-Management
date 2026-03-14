@@ -1,0 +1,7 @@
+episode,steps,ep_reward,avg_speed,total_energy,avg_wiggle,avg_safety,success,reason
+1,188,-421.01,5.90,375.63,0.0334,0.0000,0,stuck_too_long
+2,138,-446.65,7.84,341.77,0.0357,0.0000,0,stuck_too_long
+3,138,-446.62,7.84,341.77,0.0317,0.0000,0,stuck_too_long
+4,178,-427.09,6.21,318.41,0.0358,0.0000,0,stuck_too_long
+5,195,-436.79,5.71,443.01,0.0441,0.0000,0,stuck_too_long
+6,29,-174.72,23.82,160.71,0.0969,0.0265,0,collision

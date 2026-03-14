@@ -46,7 +46,7 @@ class SumoEnv(gym.Env):
         self.impatience = impatience
 
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(22,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(30,), dtype=np.float32)
 
         self.last_known_dist = 0.0
 
@@ -182,33 +182,42 @@ class SumoEnv(gym.Env):
             return default
 
     def _get_surroundings(self):
-        # OPT 5: Gộp logic xử lý trái/phải vào 1 helper để tránh trùng code
+        # Theo dõi 2 xe gần nhất phía trước + 2 xe phía sau mỗi bên (trái/phải)
+        # Tổng: 8 xe × 2 giá trị (dist, relspeed) = 16 chiều
+        # Layout: [LF1, LF1_v, LF2, LF2_v, LB1, LB1_v, LB2, LB2_v,
+        #          RF1, RF1_v, RF2, RF2_v, RB1, RB1_v, RB2, RB2_v]
+        result = [1.0, 0.0] * 8  # 8 slots mặc định (xa / tốc độ bằng 0)
         my_speed = self.veh_data["speed"] if self.veh_data else 0.0
-        result = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]  # LF, LB, RF, RB (dist, relspeed)
 
-        def process_side(neighbors, f_idx, b_idx):
-            closest_f = float("inf")
-            closest_b = float("inf")
+        def process_side(neighbors, base_f, base_b):
+            """Điền 2 xe gần nhất phía trước (base_f) và 2 xe phía sau (base_b)."""
+            fronts, backs = [], []
             for n_id, dist in neighbors:
                 try:
                     n_speed = traci.vehicle.getSpeed(n_id)
                 except:
                     continue
                 if dist > 0:
-                    if dist < closest_f:
-                        closest_f = dist
-                        result[f_idx]     = min(dist, self.MAX_DIST) / self.MAX_DIST
-                        result[f_idx + 1] = (my_speed - n_speed) / self.MAX_SPEED
+                    fronts.append((dist, n_speed))
                 else:
-                    adist = abs(dist)
-                    if adist < closest_b:
-                        closest_b = adist
-                        result[b_idx]     = min(adist, self.MAX_DIST) / self.MAX_DIST
-                        result[b_idx + 1] = (my_speed - n_speed) / self.MAX_SPEED
+                    backs.append((abs(dist), n_speed))
+            fronts.sort(key=lambda x: x[0])
+            backs.sort(key=lambda x: x[0])
+            for slot, (d, spd) in enumerate(fronts[:2]):
+                idx = base_f + slot * 2
+                result[idx]     = min(d, self.MAX_DIST) / self.MAX_DIST
+                result[idx + 1] = (my_speed - spd) / self.MAX_SPEED
+            for slot, (d, spd) in enumerate(backs[:2]):
+                idx = base_b + slot * 2
+                result[idx]     = min(d, self.MAX_DIST) / self.MAX_DIST
+                result[idx + 1] = (my_speed - spd) / self.MAX_SPEED
 
         try:
-            process_side(traci.vehicle.getNeighbors(self.VEH_ID, 2), 0, 2)  # trái
-            process_side(traci.vehicle.getNeighbors(self.VEH_ID, 1), 4, 6)  # phải
+            # Layout 16 chiều:
+            # [0..3]  = LF1,LF1v,LF2,LF2v  |  [4..7]  = LB1,LB1v,LB2,LB2v
+            # [8..11] = RF1,RF1v,RF2,RF2v   |  [12..15]= RB1,RB1v,RB2,RB2v
+            process_side(traci.vehicle.getNeighbors(self.VEH_ID, 2), 0, 4)   # trái:  F@0, B@4
+            process_side(traci.vehicle.getNeighbors(self.VEH_ID, 1), 8, 12)  # phải:  F@8, B@12
         except:
             pass
 
@@ -216,7 +225,7 @@ class SumoEnv(gym.Env):
 
     def _get_obs(self):
         if self.veh_data is None:
-            return np.zeros(22, dtype=np.float32)
+            return np.zeros(30, dtype=np.float32)
 
         d = self.veh_data
 
@@ -272,7 +281,7 @@ class SumoEnv(gym.Env):
             return obs.astype(np.float32)
 
         except Exception:
-            return np.zeros(22, dtype=np.float32)
+            return np.zeros(30, dtype=np.float32)
 
     def _get_dist_to_destination(self):
         try:
@@ -306,14 +315,13 @@ class SumoEnv(gym.Env):
         if not self.veh_data: return 0.0
         d = self.veh_data
 
-        W_SPEED    =  1.3
-        W_PROGRESS =  0.85
+        W_SPEED    =  1.2
+        W_PROGRESS =  0.8
         W_ENERGY   = -0.10
         W_COMFORT  = -0.05   # chỉ jerk ga/phanh — KHÔNG phạt tay lái để xe dám chuyển làn
         W_SAFETY   = -0.8
         W_TIME     = -0.2
-        W_LANE     = -0.5    # phạt sai làn, tăng dần khi gần khúc rẽ
-        W_LANE_OK  =  0.4    # thưởng khi đang đúng làn
+        # W_LANE / W_LANE_OK đã bỏ — SUMO mode 514 đảm nhiệm việc đưa xe về đúng làn
 
         # --- Progress ---
         dist = self._get_dist_to_destination()
@@ -344,35 +352,18 @@ class SumoEnv(gym.Env):
         if leader is not None and leader[1] < target_dist:
             safety_penalty = float(np.exp(-(leader[1] / target_dist)))
 
-        # --- Lane guidance — dùng cache, không gọi lại _get_next_turn_info() ---
-        _, turn_dist_n, lane_offset = self._turn_info_cache
-        urgency    = float(np.clip(1.0 - turn_dist_n, 0.0, 1.0))
-        abs_offset = float(np.abs(lane_offset))
-
-        if abs_offset < 0.01:
-            lane_reward = W_LANE_OK
-        else:
-            lane_reward = W_LANE * abs_offset * (0.3 + 0.7 * urgency)
-            # Thưởng thêm khi đang sai làn nhưng đang đánh lái đúng hướng
-            steer_in_correct_direction = (lane_offset > 0 and action[0] > 0.15) or \
-                                         (lane_offset < 0 and action[0] < -0.15)
-            if steer_in_correct_direction:
-                lane_reward += 0.3 * urgency
-
         # --- Tổng hợp ---
         speed_reward    = np.nan_to_num(speed_reward)
         progress_reward = np.nan_to_num(progress_reward)
         energy_penalty  = np.nan_to_num(energy_penalty)
         accel_jerk      = np.nan_to_num(accel_jerk)
         safety_penalty  = np.nan_to_num(safety_penalty)
-        lane_reward     = np.nan_to_num(lane_reward)
 
         return (speed_reward    * W_SPEED)    + \
                (progress_reward * W_PROGRESS) + \
                (accel_jerk      * W_COMFORT)  + \
                (safety_penalty  * W_SAFETY)   + \
                (energy_penalty  * W_ENERGY)   + \
-               lane_reward                    + \
                W_TIME
 
     def reset(self, seed=None, options=None):
@@ -563,23 +554,27 @@ class SumoEnv(gym.Env):
         # Dùng giá trị từ cache (đã tính ở cuối bước trước) để tránh gọi hàm thêm
         _, turn_dist_n, lane_offset = self._turn_info_cache
         # Nếu đang ở 30% cuối của đường VÀ đang sai làn → Bật tự động chuyển làn để cứu (514)
-        if turn_dist_n <= 0.3 and abs(lane_offset) > 0.01:
+        sumo_rescue_active = turn_dist_n <= 0.2
+        if sumo_rescue_active:
             traci.vehicle.setLaneChangeMode(self.VEH_ID, 514)
         else:
             traci.vehicle.setLaneChangeMode(self.VEH_ID, 0)
 
         # Áp dụng action
         traci.vehicle.setAcceleration(self.VEH_ID, desired_accel, duration=0.5)
-        LC_THRESHOLD    = 0.15
-        current_lane_idx = traci.vehicle.getLaneIndex(self.VEH_ID)
-        if steer_cmd < -LC_THRESHOLD:
-            traci.vehicle.changeLane(self.VEH_ID, max(0, current_lane_idx - 1), 0.5)
-        elif steer_cmd > LC_THRESHOLD:
-            try:
-                edge_id   = traci.vehicle.getRoadID(self.VEH_ID)
-                num_lanes = traci.edge.getLaneNumber(edge_id)
-                traci.vehicle.changeLane(self.VEH_ID, min(num_lanes - 1, current_lane_idx + 1), 0.5)
-            except: pass
+        # Khi SUMO đang cứu xe (mode 514), không phát lệnh changeLane từ agent
+        # để tránh xung đột hai bên → gây dao động qua lại giữa các làn
+        if not sumo_rescue_active:
+            LC_THRESHOLD     = 0.15
+            current_lane_idx = traci.vehicle.getLaneIndex(self.VEH_ID)
+            if steer_cmd < -LC_THRESHOLD:
+                traci.vehicle.changeLane(self.VEH_ID, max(0, current_lane_idx - 1), 0.5)
+            elif steer_cmd > LC_THRESHOLD:
+                try:
+                    edge_id   = traci.vehicle.getRoadID(self.VEH_ID)
+                    num_lanes = traci.edge.getLaneNumber(edge_id)
+                    traci.vehicle.changeLane(self.VEH_ID, min(num_lanes - 1, current_lane_idx + 1), 0.5)
+                except: pass
 
         reward             = 0.0
         terminated         = False
@@ -589,19 +584,29 @@ class SumoEnv(gym.Env):
         valid_steps        = 0
         termination_reason = "running"
 
+                # Trong hàm step()
         for _ in range(SIM_STEPS):
             traci.simulationStep()
-            self._update_cache()   # Cập nhật cache + turn_info_cache ngay sau mỗi bước
-
-            if self.veh_data is None:
+            
+            # KIỂM TRA VA CHẠM TRƯỚC KHI CẬP NHẬT CACHE
+            colliding_ids = traci.simulation.getCollidingVehiclesIDList()
+            if self.VEH_ID in colliding_ids:
                 terminated = True
-                teleport_list = traci.simulation.getStartingTeleportIDList()
-                if self.VEH_ID in teleport_list:
-                    reward -= 50.0
-                    termination_reason = "teleport"
+                reward = -200.0  # Phạt nặng vì đâm xe
+                termination_reason = "collision"
+                self.veh_data = None # Đánh dấu xe đã mất
+                break # Thoát vòng lặp ngay lập tức
+
+            self._update_cache() # Cập nhật thông tin nếu xe còn sống
+            
+            # Kiểm tra các lý do khác (Về đích, Teleport...)
+            if self.veh_data is None:
+                if self._success_check():
+                    reward = 200.0
+                    termination_reason = "goal"
                 else:
-                    reward -= 200.0
-                    termination_reason = "collision"
+                    termination_reason = "removed_unknown"
+                terminated = True
                 break
 
             ego_speed = self.veh_data["speed"]

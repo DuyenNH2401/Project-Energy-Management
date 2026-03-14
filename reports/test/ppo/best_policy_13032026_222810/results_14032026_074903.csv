@@ -1,0 +1,5 @@
+episode,steps,ep_reward,avg_speed,total_energy,avg_wiggle,avg_safety,success,reason
+1,192,263.18,11.56,982.14,0.0000,0.0054,1,goal
+2,84,-134.65,16.24,583.43,0.0001,0.0344,0,collision
+3,80,-147.36,12.63,452.30,0.0000,0.0155,0,collision
+4,63,-159.62,10.37,239.11,0.0001,0.0236,0,collision

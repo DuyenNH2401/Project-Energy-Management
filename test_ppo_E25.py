@@ -14,6 +14,7 @@ import os
 import sys
 import csv
 import time
+import math
 import random
 import argparse
 import torch
@@ -44,7 +45,7 @@ VTYPE_ID     = "custom_passenger_car"
 
 # Must mirror your training network exactly
 HIDDEN_SIZES  = [256, 256]
-OBS_SHAPE     = (22,)
+OBS_SHAPE     = (30,)
 ACT_SHAPE     = (2,)
 
 LR            = 3e-4
@@ -52,7 +53,7 @@ GAMMA         = 0.99
 GAE_LAMBDA    = 0.95
 MAX_GRAD_NORM = 0.3
 VF_COEF       = 0.25
-ENT_COEF      = 0.01
+ENT_COEF      = 0.05
 
 MAX_SPEED     = 55.6
 MAX_ACCEL     = 4.15
@@ -77,6 +78,8 @@ CSV_HEADER = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def build_policy():
+    import gymnasium as gym
+    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=ACT_SHAPE, dtype=np.float32)
     net    = Net(OBS_SHAPE, hidden_sizes=HIDDEN_SIZES, device=DEVICE)
     actor  = ActorProb(net, ACT_SHAPE, device=DEVICE, unbounded=True).to(DEVICE)
     critic = Critic(net, device=DEVICE).to(DEVICE)
@@ -86,6 +89,7 @@ def build_policy():
     policy = PPOPolicy(
         actor, critic, optim,
         dist_fn=torch.distributions.Normal,
+        action_space=action_space,
         discount_factor=GAMMA,
         gae_lambda=GAE_LAMBDA,
         max_grad_norm=MAX_GRAD_NORM,
@@ -248,38 +252,133 @@ def get_veh_data() -> dict | None:
 
 
 def get_surroundings(my_speed: float) -> list:
-    data = {
-        "L_F_Dist": 1.0, "L_F_RelSpeed": 0.0,
-        "L_B_Dist": 1.0, "L_B_RelSpeed": 0.0,
-        "R_F_Dist": 1.0, "R_F_RelSpeed": 0.0,
-        "R_B_Dist": 1.0, "R_B_RelSpeed": 0.0,
-    }
+    """
+    Mirrors env_random._get_surroundings():
+    8 xe × 2 giá trị (dist, rel_speed) = 16 chiều
+    Layout: [LF1,LF1v, LF2,LF2v, LB1,LB1v, LB2,LB2v,
+             RF1,RF1v, RF2,RF2v, RB1,RB1v, RB2,RB2v]
+    """
+    result = [1.0, 0.0] * 8  # 8 slots mặc định
+
+    def process_side(neighbors, base_f, base_b):
+        fronts, backs = [], []
+        for n_id, dist in neighbors:
+            try:
+                n_speed = traci.vehicle.getSpeed(n_id)
+            except Exception:
+                continue
+            if dist > 0:
+                fronts.append((dist, n_speed))
+            else:
+                backs.append((abs(dist), n_speed))
+        fronts.sort(key=lambda x: x[0])
+        backs.sort(key=lambda x: x[0])
+        for slot, (d, spd) in enumerate(fronts[:2]):
+            idx = base_f + slot * 2
+            result[idx]     = min(d, MAX_DIST) / MAX_DIST
+            result[idx + 1] = (my_speed - spd) / MAX_SPEED
+        for slot, (d, spd) in enumerate(backs[:2]):
+            idx = base_b + slot * 2
+            result[idx]     = min(d, MAX_DIST) / MAX_DIST
+            result[idx + 1] = (my_speed - spd) / MAX_SPEED
+
     try:
-        for n_id, dist in traci.vehicle.getNeighbors(VEH_ID, 2):
-            n_speed = traci.vehicle.getSpeed(n_id)
-            if dist > 0:
-                data["L_F_Dist"]     = min(dist, MAX_DIST) / MAX_DIST
-                data["L_F_RelSpeed"] = (my_speed - n_speed) / MAX_SPEED
-            else:
-                data["L_B_Dist"]     = min(abs(dist), MAX_DIST) / MAX_DIST
-                data["L_B_RelSpeed"] = (my_speed - n_speed) / MAX_SPEED
-        for n_id, dist in traci.vehicle.getNeighbors(VEH_ID, 1):
-            n_speed = traci.vehicle.getSpeed(n_id)
-            if dist > 0:
-                data["R_F_Dist"]     = min(dist, MAX_DIST) / MAX_DIST
-                data["R_F_RelSpeed"] = (my_speed - n_speed) / MAX_SPEED
-            else:
-                data["R_B_Dist"]     = min(abs(dist), MAX_DIST) / MAX_DIST
-                data["R_B_RelSpeed"] = (my_speed - n_speed) / MAX_SPEED
+        # Layout 16 chiều:
+        # [0..3]  = LF1,LF1v,LF2,LF2v  |  [4..7]  = LB1,LB1v,LB2,LB2v
+        # [8..11] = RF1,RF1v,RF2,RF2v   |  [12..15]= RB1,RB1v,RB2,RB2v
+        process_side(traci.vehicle.getNeighbors(VEH_ID, 2), 0, 4)   # trái
+        process_side(traci.vehicle.getNeighbors(VEH_ID, 1), 8, 12)  # phải
     except Exception:
         pass
-    return list(data.values())
+    return result
+
+
+def _edge_heading(edge_id: str) -> float | None:
+    """Tính góc hướng của một edge (degrees), dùng cho get_turn_info."""
+    try:
+        shape = traci.edge.getShape(edge_id)
+        if len(shape) < 2:
+            return None
+        x1, y1 = shape[0]
+        x2, y2 = shape[-1]
+        return math.degrees(math.atan2(y2 - y1, x2 - x1))
+    except Exception:
+        return None
+
+
+def get_turn_info(d: dict) -> tuple:
+    """
+    Tính (turn_dir, turn_dist_n, lane_offset) cho route cố định FIXED_EDGES.
+    Mirrors env_random._get_next_turn_info().
+    - turn_dir      : [-1=trái … +1=phải, 0=thẳng]
+    - turn_dist_n   : tỉ lệ còn lại trên edge hiện tại  [1=xa, 0=sắp rẽ]
+    - lane_offset   : số làn cần dịch  [-1=trái … +1=phải, 0=đúng rồi]
+    """
+    default = (0.0, 1.0, 0.0)
+    try:
+        current_edge = d["road_id"]
+        if current_edge.startswith(":"):
+            return default
+        if current_edge not in FIXED_EDGES:
+            return default
+
+        indices  = [i for i, x in enumerate(FIXED_EDGES) if x == current_edge]
+        curr_idx = indices[-1]
+        if curr_idx >= len(FIXED_EDGES) - 1:
+            return default
+
+        next_edge = FIXED_EDGES[curr_idx + 1]
+
+        # Hướng rẽ
+        a1 = _edge_heading(current_edge)
+        a2 = _edge_heading(next_edge)
+        if a1 is None or a2 is None:
+            turn_dir = 0.0
+        else:
+            diff = (a2 - a1 + 360) % 360
+            if diff > 180:
+                diff -= 360
+            turn_dir = float(np.clip(-diff / 180.0, -1.0, 1.0))
+
+        # Khoảng cách còn lại trên edge hiện tại
+        lane_id = d["lane_id"]
+        if not lane_id:
+            return (turn_dir, 1.0, 0.0)
+        try:
+            lane_len = traci.lane.getLength(lane_id)
+        except Exception:
+            return (turn_dir, 1.0, 0.0)
+        dist_left     = max(0.0, lane_len - d["lane_pos"])
+        turn_dist_n   = float(np.clip(dist_left / max(lane_len, 1.0), 0.0, 1.0))
+
+        # Làn nào trên current_edge kết nối sang next_edge
+        num_lanes    = traci.edge.getLaneNumber(current_edge)
+        correct_lane = None
+        for li in range(num_lanes):
+            try:
+                for link in traci.lane.getLinks(f"{current_edge}_{li}"):
+                    if traci.lane.getEdgeID(link[0]) == next_edge:
+                        correct_lane = li
+                        break
+            except Exception:
+                continue
+            if correct_lane is not None:
+                break
+
+        if correct_lane is None:
+            return (turn_dir, turn_dist_n, 0.0)
+
+        raw_offset  = correct_lane - d["lane_idx"]
+        lane_offset = float(np.clip(raw_offset / max(1, num_lanes - 1), -1.0, 1.0))
+        return (turn_dir, turn_dist_n, lane_offset)
+    except Exception:
+        return default
 
 
 def get_obs(route_len: float) -> np.ndarray:
     d = get_veh_data()
     if d is None:
-        return np.zeros(22, dtype=np.float32)
+        return np.zeros(30, dtype=np.float32)
     try:
         velocity     = np.clip(d["speed"]  / MAX_SPEED,  0.0,  2.0)
         acceleration = np.clip(d["accel"]  / MAX_ACCEL, -1.0,  1.0)
@@ -304,8 +403,6 @@ def get_obs(route_len: float) -> np.ndarray:
 
         lane_id     = d["lane_id"]
         speed_limit = traci.lane.getMaxSpeed(lane_id) / MAX_SPEED if lane_id else 1.0
-        can_left    = 1.0 if lane_idx < (total_lanes - 1) else 0.0
-        can_right   = 1.0 if lane_idx > 0 else 0.0
 
         tls_data = d["tls"]
         if tls_data:
@@ -314,13 +411,13 @@ def get_obs(route_len: float) -> np.ndarray:
         else:
             tls_dist, tls_state = 1.0, 1.0
 
-        lane_len  = traci.lane.getLength(lane_id) if lane_id else 100.0
-        turn_dist = min(lane_len - d["lane_pos"], MAX_DIST) / MAX_DIST
+        # Route-aware lane guidance — dùng get_turn_info() thực
+        turn_dir, turn_dist_n, lane_offset = get_turn_info(d)
 
         obs_list = [
             velocity, acceleration, elec, norm_lane, slope, lat_offset,
             l_dist, l_rel_speed,
-            speed_limit, can_left, can_right, tls_dist, tls_state, turn_dist,
+            speed_limit, turn_dir, turn_dist_n, tls_dist, tls_state, lane_offset,
         ] + surroundings
 
         obs = np.array(obs_list, dtype=np.float64)
@@ -328,7 +425,7 @@ def get_obs(route_len: float) -> np.ndarray:
         obs = np.clip(obs, -5.0, 5.0)
         return obs.astype(np.float32)
     except Exception:
-        return np.zeros(22, dtype=np.float32)
+        return np.zeros(30, dtype=np.float32)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -366,23 +463,38 @@ def step_env(
     desired_accel = accel_cmd * MAX_ACCEL if accel_cmd >= 0 else accel_cmd * MAX_DECEL
 
     if VEH_ID not in traci.vehicle.getIDList():
-        obs = np.zeros(22, dtype=np.float32)
+        obs = np.zeros(30, dtype=np.float32)
         return obs, 0.0, True, False, {"real_speed": 0.0, "reason": "already_dead", "is_success": 0}, stuck_time, action
+
+    # ── SUMO rescue: bật mode 514 khi gần cuối edge VÀ đang sai làn ─────────
+    # Mirrors env_random.step() sumo_rescue_active logic
+    _d_pre = get_veh_data()
+    if _d_pre is not None:
+        _, _turn_dist_n, _lane_offset = get_turn_info(_d_pre)
+        sumo_rescue_active = _turn_dist_n <= 0.3
+    else:
+        sumo_rescue_active = False
+
+    if sumo_rescue_active:
+        traci.vehicle.setLaneChangeMode(VEH_ID, 514)
+    else:
+        traci.vehicle.setLaneChangeMode(VEH_ID, 0)
 
     # Apply acceleration
     traci.vehicle.setAcceleration(VEH_ID, desired_accel, duration=0.5)
 
-    # Apply lane change
-    LC_THRESHOLD = 0.3
-    current_lane = traci.vehicle.getLaneIndex(VEH_ID)
-    if steer_cmd < -LC_THRESHOLD:
-        traci.vehicle.changeLane(VEH_ID, max(0, current_lane - 1), 1.0)
-    elif steer_cmd > LC_THRESHOLD:
-        try:
-            n_lanes = traci.edge.getLaneNumber(traci.vehicle.getRoadID(VEH_ID))
-            traci.vehicle.changeLane(VEH_ID, min(n_lanes - 1, current_lane + 1), 1.0)
-        except Exception:
-            pass
+    # Apply lane change — chỉ khi SUMO không đang cứu xe (tránh xung đột)
+    if not sumo_rescue_active:
+        LC_THRESHOLD = 0.3
+        current_lane = traci.vehicle.getLaneIndex(VEH_ID)
+        if steer_cmd < -LC_THRESHOLD:
+            traci.vehicle.changeLane(VEH_ID, max(0, current_lane - 1), 1.0)
+        elif steer_cmd > LC_THRESHOLD:
+            try:
+                n_lanes = traci.edge.getLaneNumber(traci.vehicle.getRoadID(VEH_ID))
+                traci.vehicle.changeLane(VEH_ID, min(n_lanes - 1, current_lane + 1), 1.0)
+            except Exception:
+                pass
 
     traci.simulationStep()
     d = get_veh_data()

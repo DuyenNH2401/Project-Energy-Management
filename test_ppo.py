@@ -30,11 +30,11 @@ from tianshou.utils.net.continuous import ActorProb, Critic
 from tianshou.policy import PPOPolicy
 
 # ── Local env ─────────────────────────────────────────────────────────────────
-from simulation.env_random import SumoEnv
+from simulation.sumo_env import SumoEnv
 #dang test env cu
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONFIG  (mirrors ppo_ban_dau_random.py – must stay in sync)
+# CONFIG  (mirrors ppo.py – must stay in sync)
 # ═══════════════════════════════════════════════════════════════════════════════
 MAP_CONFIGS = [
     "maps/map_grid_tuned/run.sumocfg",

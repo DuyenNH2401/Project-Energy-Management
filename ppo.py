@@ -1,10 +1,13 @@
-#Đây là bản train bình thường
+#Đây là bản ban đầu
 import os
+import math
+import time
 import csv
 import torch
 import numpy as np
 import gymnasium as gym
 from datetime import datetime
+from typing import Optional, List, Dict, Any
 
 # Tianshou imports
 from tianshou.policy import PPOPolicy
@@ -15,273 +18,209 @@ from tianshou.utils.net.continuous import ActorProb, Critic
 from tianshou.trainer import OnpolicyTrainer
 
 # Import the provided SUMO environment
-try:
-    from simulation.continuous_sumo_env import SumoEnv
-except ImportError:
-    from continuous_sumo_env import SumoEnv
+
+from simulation.sumo_env import SumoEnv
 
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
+# --- ADD THIS CLASS AFTER IMPORTS ---
+class SilentLogger:
+    """A dummy logger that does nothing, satisfying Tianshou's requirements."""
+    def __init__(self):
+        pass
 
+    def write(self, *args, **kwargs):
+        pass
+
+    def log_train_data(self, *args, **kwargs):
+        pass
+
+    def log_test_data(self, *args, **kwargs):
+        pass
+
+    def log_update_data(self, *args, **kwargs):
+        pass
+
+    def save_data(self, *args, **kwargs):
+        pass
+
+
+# --- CONFIGURATION ---
+# UPDATE THESE PATHS TO MATCH YOUR ACTUAL FILES
 MAP_CONFIGS = [
-    "maps/map1/run.sumocfg"
+    "maps/map_grid_tuned/run.sumocfg"
 ]
 
-LOG_DIR   = "reports/tianshou_ppo/"
-MODEL_DIR = "models/tianshou_ppo/"
+LOG_DIR = "reports/tianshou_ppo/"
+MODEL_DIR = "models/tianshou_ppo/" 
+# Log file name (fixed per day to avoid too many files, or add timestamp)
 CSV_FILENAME = f"training_log_{datetime.now().strftime('%d%m%Y_%H%M%S')}.csv"
-CSV_PATH  = os.path.join(LOG_DIR, CSV_FILENAME)
-
+CSV_PATH = os.path.join(LOG_DIR, CSV_FILENAME)
 SEED = 42
 
-CSV_HEADER = [
-    "episode", "steps", "ep_reward",
-    "avg_speed", "total_energy", "wiggle",
-    "safety", "success", "reason"
-]
+# Header requested by user
+CSV_HEADER = ["episode", "steps", "ep_reward", "avg_speed", "total_energy", "wiggle", "safety", "success", "reason", "route"]
 
-# --- Hyperparameters ---
-LR               = 3e-4
-GAMMA            = 0.99
-GAE_LAMBDA       = 0.95
-MAX_GRAD_NORM    = 0.5
-VF_COEF          = 0.25
-ENT_COEF         = 0.01
-EPOCH            = 500
-STEP_PER_COLLECT = 2048          # steps gathered per collection round
-STEP_PER_EPOCH   = STEP_PER_COLLECT  # one collection round per epoch
-REPEAT_PER_COLLECT = 10          # PPO update passes per collection
-BATCH_SIZE       = 64
-# Buffer must hold at least one full collection; give 2× headroom
-BUFFER_SIZE      = STEP_PER_COLLECT * 2
+# Hyperparameters
+LR = 3e-4
+GAMMA = 0.99
+GAE_LAMBDA = 0.95
+MAX_GRAD_NORM = 0.3
+VF_COEF = 0.25
+ENT_COEF = 0.05  # Tăng lên để khuyến khích agent thử nghiệm nhiều hành động hơn (exploration) thay vì hội tụ sớm
 
-# --- Reward-shaping coefficients (tune to your env's reward scale) ---
-ENERGY_PENALTY_COEF  = 0.01   # penalise energy consumption each step
-SAFETY_PENALTY_COEF  = 1.0    # penalise proximity / collision risk
-WIGGLE_PENALTY_COEF  = 0.05   # penalise jerk for smoother, more efficient driving
-
+TOTAL_TIMESTEPS = 2000000
+STEP_PER_EPOCH = 4096
+REPEAT_PER_COLLECT = 10
+BATCH_SIZE = 128
+EPOCH = int(np.ceil(TOTAL_TIMESTEPS / STEP_PER_EPOCH))
+BUFFER_SIZE = 8192
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-# =============================================================================
-# SILENT LOGGER  (CSV logging is handled by MetricsWrapper instead)
-# =============================================================================
-
-class SilentLogger:
-    """Satisfies Tianshou's logger interface without doing anything."""
-
-    def write(self, *args, **kwargs):           pass
-    def log_train_data(self, *args, **kwargs):  pass
-    def log_test_data(self, *args, **kwargs):   pass
-    def log_update_data(self, *args, **kwargs): pass
-    def save_data(self, *args, **kwargs):       pass
-    def restore_data(self):                     pass  # required by some Tianshou versions
-
-
-# =============================================================================
-# CSV HELPER
-# =============================================================================
-
-def init_csv_logging(filepath: str) -> None:
-    """Create log file with header if it does not already exist."""
+# --- HELPER: INIT LOG FILE ---
+def init_csv_logging(filepath):
+    """Creates the file and writes header ONLY if file does not exist."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     if not os.path.exists(filepath):
-        with open(filepath, "w", newline="") as f:
-            csv.writer(f).writerow(CSV_HEADER)
-        print(f"[Logger] Created new log file : {filepath}")
+        with open(filepath, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(CSV_HEADER)
+        print(f"Created new log file: {filepath}")
     else:
-        print(f"[Logger] Appending to existing: {filepath}")
+        print(f"Appending to existing log file: {filepath}")
 
-
-# =============================================================================
-# METRICS WRAPPER
-# =============================================================================
-
+# --- CUSTOM WRAPPER FOR LOGGING ---
 class MetricsWrapper(gym.Wrapper):
     """
-    Wraps SumoEnv to:
-      1. Apply reward shaping for energy efficiency, safety, and smoothness.
-      2. Accumulate per-episode statistics.
-      3. Write one CSV row immediately when an episode ends.
-
-    The episode counter is thread-safe for single-process (DummyVectorEnv) use
-    and is initialised from the existing file so resuming a run is seamless.
+    Wraps SumoEnv to calculate episode stats and write to CSV 
+    IMMEDIATELY upon episode termination.
     """
-
-    def __init__(self, env: gym.Env, log_filepath: str) -> None:
+    def __init__(self, env, log_filepath):
         super().__init__(env)
         self.log_filepath = log_filepath
-        self._reset_accumulators()
-
-        # Initialise episode counter from existing file (resume-friendly)
+        
+        # Accumulators
+        self.episode_reward = 0.0
+        self.episode_energy = 0.0
+        self.episode_speed_sum = 0.0
+        self.episode_steps = 0
+        self.episode_jerk_sum = 0.0
+        self.episode_safety_sum = 0.0
+        
+        # Try to determine global episode count from file line count
         self.global_ep_cnt = 0
         if os.path.exists(self.log_filepath):
             try:
-                with open(self.log_filepath, "r") as f:
-                    self.global_ep_cnt = max(0, sum(1 for _ in f) - 1)  # subtract header
-            except Exception:
+                with open(self.log_filepath, 'r') as f:
+                    # Subtract 1 for header, ensure non-negative
+                    self.global_ep_cnt = max(0, sum(1 for _ in f) - 1)
+            except:
                 self.global_ep_cnt = 0
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _reset_accumulators(self) -> None:
-        self.episode_base_reward  = 0.0
-        self.episode_shaped_reward = 0.0
-        self.episode_energy       = 0.0
-        self.episode_speed_sum    = 0.0
-        self.episode_jerk_sum     = 0.0
-        self.episode_safety_sum   = 0.0
-        self.episode_steps        = 0
-
-    # ------------------------------------------------------------------
-    # Gym interface
-    # ------------------------------------------------------------------
-
     def reset(self, **kwargs):
-        self._reset_accumulators()
+        # Reset accumulators
+        self.episode_reward = 0.0
+        self.episode_energy = 0.0
+        self.episode_speed_sum = 0.0
+        self.episode_steps = 0
+        self.episode_jerk_sum = 0.0
+        self.episode_safety_sum = 0.0
         return super().reset(**kwargs)
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
-
-        # ---- Reward shaping ------------------------------------------------
-        energy = info.get("real_energy", 0.0)
-        safety = info.get("safety", 1.0)   # assume 1.0 = perfectly safe
-        wiggle = info.get("wiggle", 0.0)
-
-        # All penalties are non-positive so they can only reduce (never inflate) reward
-        energy_penalty  = -ENERGY_PENALTY_COEF  * abs(energy)
-        safety_penalty  = -SAFETY_PENALTY_COEF  * max(0.0, 1.0 - safety)  # 0 when safe
-        wiggle_penalty  = -WIGGLE_PENALTY_COEF  * abs(wiggle)
-
-        shaped_reward = reward + energy_penalty + safety_penalty + wiggle_penalty
-
-        # ---- Accumulate stats ----------------------------------------------
-        self.episode_base_reward   += reward
-        self.episode_shaped_reward += shaped_reward
-        self.episode_energy        += energy
-        self.episode_speed_sum     += info.get("real_speed", 0.0)
-        self.episode_jerk_sum      += abs(wiggle)
-        self.episode_safety_sum    += safety
-        self.episode_steps         += 1
-
-        # ---- End-of-episode logging ----------------------------------------
+        
+        # Accumulate per-step data
+        self.episode_reward += reward
+        self.episode_energy += info.get("real_energy", 0.0)
+        # Assuming info['real_speed'] is the instant speed or average provided by Env
+        # We sum it up here to calculate our own average over the episode length
+        self.episode_speed_sum += info.get("real_speed", 0.0) 
+        self.episode_jerk_sum += info.get("wiggle", 0.0)
+        self.episode_safety_sum += info.get("safety", 0.0)
+        self.episode_steps += 1
+        
+        # LOGGING TRIGGER
         if terminated or truncated:
             self.global_ep_cnt += 1
-            n = max(1, self.episode_steps)
-
+            
+            # Calculate Averages
+            avg_speed = self.episode_speed_sum / max(1, self.episode_steps)
+            avg_safety = self.episode_safety_sum / max(1, self.episode_steps)
+            avg_jerk = self.episode_jerk_sum / max(1, self.episode_steps)
+            
+            success = info.get("is_success", 0)
+            reason = info.get("reason", "unknown")
+            route_str = info.get("route", "") if reason in ["stuck_too_long", "timeout", "teleport"] else ""
+            
+            # Prepare Row
             row = [
                 self.global_ep_cnt,
                 self.episode_steps,
-                f"{self.episode_shaped_reward:.2f}",
-                f"{self.episode_speed_sum  / n:.2f}",
+                f"{self.episode_reward:.2f}",
+                f"{avg_speed:.2f}",
                 f"{self.episode_energy:.2f}",
-                f"{self.episode_jerk_sum   / n:.4f}",
-                f"{self.episode_safety_sum / n:.4f}",
-                info.get("is_success", 0),
-                info.get("reason", "unknown"),
+                f"{avg_jerk:.4f}",
+                f"{avg_safety:.4f}",
+                success,
+                reason,
+                route_str
             ]
+            
+            # Write to CSV immediately (Append mode)
             try:
-                with open(self.log_filepath, "a", newline="") as f:
-                    csv.writer(f).writerow(row)
+                with open(self.log_filepath, 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(row)
             except Exception as e:
-                print(f"[Logger] CSV write error: {e}")
+                print(f"Logging Error: {e}")
+            
+        return obs, reward, terminated, truncated, info
 
-        return obs, shaped_reward, terminated, truncated, info
+# --- MAIN TRAINING FUNCTION ---
+def train_ppo():
+    # 1. Init Logging
+    init_csv_logging(CSV_PATH)
+    os.makedirs(MODEL_DIR, exist_ok=True)
 
+    # 2. Define Environment Factory
+    def make_env():
+        # Pass the map list to the env
+        env = SumoEnv(
+            render=False, # Set to True if you want to see GUI (slower)
+            map_config=MAP_CONFIGS,
+            test_mode=False
+        )
+        # Wrap it with our logger
+        env = MetricsWrapper(env, CSV_PATH)
+        return env
 
-# =============================================================================
-# NETWORK UTILITIES
-# =============================================================================
+    # 3. Vectorized Environment
+    # DummyVectorEnv is used to avoid Multiprocessing issues with TraCI
+    train_envs = DummyVectorEnv([make_env for _ in range(1)])
+    test_envs = DummyVectorEnv([make_env for _ in range(1)])
 
-def _init_weights(modules) -> None:
-    """Orthogonal weight init + zero bias — standard for PPO."""
-    for m in modules:
+    # 4. Network Setup
+    state_shape = train_envs.observation_space[0].shape
+    action_shape = train_envs.action_space[0].shape
+    
+    net = Net(state_shape, hidden_sizes=[256, 256], device=DEVICE)
+    actor = ActorProb(net, action_shape, device=DEVICE, unbounded=True).to(DEVICE)
+    critic = Critic(net, device=DEVICE).to(DEVICE)
+    
+    for m in list(actor.modules()) + list(critic.modules()):
         if isinstance(m, torch.nn.Linear):
             torch.nn.init.orthogonal_(m.weight)
             torch.nn.init.zeros_(m.bias)
 
+    # Fixed: Removed duplicate parameters warning
+    optim = torch.optim.Adam(set(list(actor.parameters()) + list(critic.parameters())), lr=LR)
 
-def make_actor_critic(state_shape, action_shape):
-    """
-    Returns (actor, critic, optimiser) with SEPARATE backbone networks.
-    Sharing a single Net between actor and critic causes gradient interference
-    and is a critical bug — this function avoids that entirely.
-    """
-    # Two independent feature extractors
-    actor_net = Net(state_shape, hidden_sizes=[256, 256], device=DEVICE)
-    critic_net = Net(state_shape, hidden_sizes=[256, 256], device=DEVICE)
-
-    actor  = ActorProb(actor_net,  action_shape, device=DEVICE, unbounded=True).to(DEVICE)
-    critic = Critic(critic_net, device=DEVICE).to(DEVICE)
-
-    _init_weights(list(actor.modules()))
-    _init_weights(list(critic.modules()))
-
-    # Parameters are disjoint so no set() deduplication needed
-    optim = torch.optim.Adam(
-        list(actor.parameters()) + list(critic.parameters()),
-        lr=LR
-    )
-    return actor, critic, optim
-
-
-# =============================================================================
-# MAIN TRAINING FUNCTION
-# =============================================================================
-
-def train_ppo() -> None:
-
-    # ── Reproducibility ───────────────────────────────────────────────────────
-    torch.manual_seed(SEED)
-    np.random.seed(SEED)
-
-    # ── Logging setup ─────────────────────────────────────────────────────────
-    init_csv_logging(CSV_PATH)
-    os.makedirs(MODEL_DIR, exist_ok=True)
-
-    # ── Environment factory ───────────────────────────────────────────────────
-    def make_env():
-        env = SumoEnv(
-            render=False,          # set True for SUMO GUI (much slower)
-            map_config=MAP_CONFIGS,
-            test_mode=False,
-        )
-        return MetricsWrapper(env, CSV_PATH)
-
-    # DummyVectorEnv avoids multiprocessing conflicts with TraCI
-    train_envs = DummyVectorEnv([make_env for _ in range(1)])
-    test_envs  = DummyVectorEnv([make_env for _ in range(1)])
-
-    train_envs.seed(SEED)
-    test_envs.seed(SEED + 100)  # different seed so test episodes are independent
-
-    # ── Networks ──────────────────────────────────────────────────────────────
-    state_shape  = train_envs.observation_space[0].shape
-    action_shape = train_envs.action_space[0].shape
-
-    actor, critic, optim = make_actor_critic(state_shape, action_shape)
-
-    # ── PPO Policy ────────────────────────────────────────────────────────────
-    #
-    # FIX: dist_fn must be a factory that accepts (mu, sigma) and returns a
-    # *batched* distribution.  Using Independent(..., 1) correctly sums
-    # log-probs across action dimensions — critical for multi-dim actions.
-    #
-    def dist_fn(mu, sigma):
-        return torch.distributions.Independent(
-            torch.distributions.Normal(mu, sigma), 1
-        )
-
+    # 5. Policy
     policy = PPOPolicy(
-        actor=actor,
-        critic=critic,
-        optim=optim,
-        dist_fn=dist_fn,
+        actor,
+        critic,
+        optim,
+        dist_fn=torch.distributions.Normal,
         action_space=train_envs.action_space[0],
         discount_factor=GAMMA,
         gae_lambda=GAE_LAMBDA,
@@ -289,81 +228,68 @@ def train_ppo() -> None:
         vf_coef=VF_COEF,
         ent_coef=ENT_COEF,
         action_scaling=True,
-        action_bound_method="clip",
+        action_bound_method="clip"
     )
 
-    # ── Collectors ────────────────────────────────────────────────────────────
+    # 6. Collectors
     train_collector = Collector(
-        policy,
-        train_envs,
+        policy, 
+        train_envs, 
         VectorReplayBuffer(BUFFER_SIZE, len(train_envs)),
-        exploration_noise=True,
+        exploration_noise=True
     )
     test_collector = Collector(policy, test_envs)
 
-    # ── Checkpoint helpers ────────────────────────────────────────────────────
+    # 7. Define Save Hook
     def save_best_fn(policy):
-        ts   = datetime.now().strftime("%d%m%Y_%H%M%S")
-        path = os.path.join(MODEL_DIR, f"best_policy_{ts}.pth")
+       
+        path = os.path.join(MODEL_DIR, f"best_policy_{datetime.now().strftime('%d%m%Y_%H%M%S')}.pth")
         torch.save(policy.state_dict(), path)
-        print(f"[Checkpoint] Best model saved → {path}")
+        print(f"Saved Best Model to {path}")
 
-    def save_checkpoint(tag: str) -> None:
-        ts   = datetime.now().strftime("%d%m%Y_%H%M%S")
-        path = os.path.join(MODEL_DIR, f"{tag}_{ts}.pth")
-        torch.save(policy.state_dict(), path)
-        print(f"[Checkpoint] {tag} saved → {path}")
-
-    # ── Trainer ───────────────────────────────────────────────────────────────
+    # 8. Trainer
     trainer = OnpolicyTrainer(
         policy=policy,
         train_collector=train_collector,
         test_collector=test_collector,
         max_epoch=EPOCH,
         step_per_epoch=STEP_PER_EPOCH,
-        step_per_collect=STEP_PER_COLLECT,
         repeat_per_collect=REPEAT_PER_COLLECT,
         episode_per_test=10,
         batch_size=BATCH_SIZE,
+        step_per_collect=2048,
         save_best_fn=save_best_fn,
-        logger=SilentLogger(),
+        logger=SilentLogger() # Logging is handled by the Wrapper now
     )
 
-    # ── Training loop ─────────────────────────────────────────────────────────
-    print(f"[Training] Device      : {DEVICE}")
-    print(f"[Training] Log file    : {CSV_PATH}")
-    print(f"[Training] Reward shape: energy×{ENERGY_PENALTY_COEF}"
-          f"  safety×{SAFETY_PENALTY_COEF}  wiggle×{WIGGLE_PENALTY_COEF}")
-    print("Press Ctrl+C to stop and save.\n")
+    # 9. Safe Training Loop
+    print(f"Starting Training on device: {DEVICE}")
+    print(f"Logging episodes to: {CSV_PATH}")
+    print("Press Ctrl+C to stop and save.")
 
     try:
+        # We iterate to print progress to console, but CSV writing happens in Wrapper
         for epoch, epoch_stat, info in trainer:
-            print(
-                f"Epoch {epoch:>4d} | "
-                f"rew={epoch_stat['rew']:+8.2f} | "
-                f"clip_loss={info.get('loss/clip', 0.0):.4f} | "
-                f"vf_loss={info.get('loss/vf',   0.0):.4f} | "
-                f"ent={info.get('loss/ent',  0.0):.4f}"
-            )
+            print(f"Epoch {epoch}: Reward={epoch_stat['rew']:.2f}, Loss={info.get('loss/clip', 0.0):.4f}")
 
     except KeyboardInterrupt:
-        print("\n[Training] Interrupted by user — saving emergency checkpoint.")
-        save_checkpoint("emergency_save")
-
+        print("\n\n!!! User Interrupted Training (Ctrl+C) !!!")
+        print("Saving emergency checkpoint...")
+        
+        save_path = os.path.join(MODEL_DIR, f"emergency_save_{datetime.now().strftime('%d%m%Y_%H%M%S')}.pth")
+        torch.save(policy.state_dict(), save_path)
+        print(f"Model saved to: {save_path}")
+        
     except Exception as e:
-        print(f"\n[Training] Critical error: {e}")
-        save_checkpoint("crash_save")
-        raise
-
+        print(f"\n!!! Critical Error: {e} !!!")
+        save_path = os.path.join(MODEL_DIR, f"crash_save_{datetime.now().strftime('%d%m%Y_%H%M%S')}.pth")
+        torch.save(policy.state_dict(), save_path)
+        raise e
+        
     finally:
         train_envs.close()
         test_envs.close()
-        print("[Training] Environments closed.")
-
-
-# =============================================================================
-# ENTRY POINT
-# =============================================================================
+        print("Training Closed.")
 
 if __name__ == "__main__":
     train_ppo()
