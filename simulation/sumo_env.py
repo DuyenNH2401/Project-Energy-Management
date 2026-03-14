@@ -40,19 +40,22 @@ class SumoEnv(gym.Env):
         self.MAX_SLOPE = 20
         self.MAX_DIST = 100
         self.TARGET_DIST = 35.0
+        self.TARGET_SPEED_RATIO = 0.9   # bám 90% tốc độ giới hạn
+        self.MIN_DESIRED_SPEED  = 3.0   # m/s — dưới mức này bị phạt too_slow
 
         self.maps = [map_config] if isinstance(map_config, str) else map_config
         self.imperfection = imperfection
         self.impatience = impatience
 
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(22,), dtype=np.float32)
+        # 19 chiều: 6 ego + 2 leader + 3 infra + 8 surroundings
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(19,), dtype=np.float32)
 
         self.last_known_dist = 0.0
 
         # --- CACHE STORAGE ---
         self.veh_data = {}
-        # OPT 1: Cache turn_info để tránh gọi nhiều lần/step
+        # OPT 1: Cache turn_info — vẫn cần cho step() để kích hoạt sumo_rescue_active
         self._turn_info_cache = (0.0, 1.0, 0.0)
         # OPT 2: Cache độ dài các edge trong route (static, không đổi trong episode)
         self._route_edge_lengths: dict = {}
@@ -82,7 +85,7 @@ class SumoEnv(gym.Env):
                 "leader":     traci.vehicle.getLeader(self.VEH_ID, dist=self.MAX_DIST),
                 "tls":        traci.vehicle.getNextTLS(self.VEH_ID),
             }
-            # OPT 3: Cập nhật turn_info ngay trong cache để dùng chung toàn bộ step
+            # OPT 3: Cập nhật turn_info cho step() (sumo_rescue_active), không dùng trong obs nữa
             self._turn_info_cache = self._get_next_turn_info()
         except Exception:
             self.veh_data = None
@@ -103,13 +106,9 @@ class SumoEnv(gym.Env):
         return valid_edges
 
     # ------------------------------------------------------------------ #
-    #  ROUTE-AWARE LANE GUIDANCE                                          #
+    #  ROUTE-AWARE LANE GUIDANCE — chỉ dùng nội bộ cho sumo_rescue_active
     # ------------------------------------------------------------------ #
     def _get_turn_direction_numeric(self, from_edge: str, to_edge: str) -> float:
-        """
-        Tính hướng rẽ khi chuyển từ from_edge → to_edge.
-        Trả về [-1, +1]:  -1 = rẽ trái/U-turn  |  0 = thẳng  |  +1 = rẽ phải
-        """
         try:
             def edge_heading(edge_id):
                 shape = traci.edge.getShape(edge_id)
@@ -128,11 +127,8 @@ class SumoEnv(gym.Env):
 
     def _get_next_turn_info(self) -> tuple:
         """
-        Nhìn trước trong current_route_edges để tìm khúc rẽ tiếp theo.
-        Trả về (turn_dir, turn_dist_norm, lane_offset):
-          turn_dir      : hướng rẽ [-1=trái … +1=phải, 0=thẳng]
-          turn_dist_norm: tỉ lệ còn lại trên edge hiện tại [1=mới vào/xa rẽ, 0=sắp rẽ]
-          lane_offset   : số làn cần dịch [-1=trái … +1=phải], 0 = đang đúng làn rồi
+        Trả về (turn_dir, turn_dist_norm, lane_offset) — chỉ dùng trong step()
+        để tính sumo_rescue_active (turn_dist_n <= 0.3), không đưa vào obs nữa.
         """
         default = (0.0, 1.0, 0.0)
         if not self.veh_data: return default
@@ -160,7 +156,6 @@ class SumoEnv(gym.Env):
             dist_left = max(0.0, lane_len - self.veh_data["lane_pos"])
             turn_dist_norm = float(np.clip(dist_left / max(lane_len, 1.0), 0.0, 1.0))
 
-            # Tìm làn nào trên current_edge kết nối sang next_edge
             num_lanes    = traci.edge.getLaneNumber(current_edge)
             correct_lane = None
             for li in range(num_lanes):
@@ -182,7 +177,7 @@ class SumoEnv(gym.Env):
             return default
 
     def _get_surroundings(self):
-        # OPT 5: Gộp logic xử lý trái/phải vào 1 helper để tránh trùng code
+        # OPT 5: 1 xe gần nhất mỗi hướng trái/phải (trước + sau) = 8 chiều
         my_speed = self.veh_data["speed"] if self.veh_data else 0.0
         result = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]  # LF, LB, RF, RB (dist, relspeed)
 
@@ -216,12 +211,12 @@ class SumoEnv(gym.Env):
 
     def _get_obs(self):
         if self.veh_data is None:
-            return np.zeros(22, dtype=np.float32)
+            return np.zeros(19, dtype=np.float32)
 
         d = self.veh_data
 
         try:
-            # 1. EGO PHYSICS
+            # 1. EGO PHYSICS (6 chiều)
             velocity     = np.clip(d["speed"] / self.MAX_SPEED, 0.0, 2.0)
             acceleration = np.clip(d["accel"] / self.MAX_ACCEL, -1.0, 1.0)
             elec         = np.clip(d["elec"]  / self.MAX_ELEC,  0.0, 5.0)
@@ -234,10 +229,10 @@ class SumoEnv(gym.Env):
             slope      = np.clip(d["slope"]      / self.MAX_SLOPE, -1.0, 1.0)
             lat_offset = np.clip(d["lat_offset"], -10.0, 10.0)
 
-            # 2. SURROUNDINGS
+            # 2. SURROUNDINGS (8 chiều)
             surroundings = self._get_surroundings()
 
-            # 3. LEADER
+            # 3. LEADER (2 chiều)
             leader = d["leader"]
             if leader:
                 l_dist      = min(leader[1], self.MAX_DIST) / self.MAX_DIST
@@ -246,7 +241,7 @@ class SumoEnv(gym.Env):
             else:
                 l_dist, l_rel_speed = 1.0, 0.0
 
-            # 4. INFRASTRUCTURE
+            # 4. INFRASTRUCTURE (3 chiều)
             lane_id     = d["lane_id"]
             speed_limit = traci.lane.getMaxSpeed(lane_id) / self.MAX_SPEED if lane_id else 1.0
 
@@ -257,14 +252,18 @@ class SumoEnv(gym.Env):
             else:
                 tls_dist, tls_state = 1.0, 1.0
 
-            # 5. ROUTE-AWARE LANE GUIDANCE — dùng cache, không gọi lại hàm
-            turn_dir, turn_dist_n, lane_offset = self._turn_info_cache
+            # turn_dir / turn_dist_n / lane_offset đã bỏ khỏi obs
+            # SUMO mode 514 đảm nhận việc đổi làn; _turn_info_cache vẫn dùng trong step()
 
             obs_list = [
+                # EGO PHYSICS  [0..5]
                 velocity, acceleration, elec, norm_lane, slope, lat_offset,
+                # LEADER       [6..7]
                 l_dist, l_rel_speed,
-                speed_limit, turn_dir, turn_dist_n, tls_dist, tls_state, lane_offset
-            ] + surroundings
+                # INFRA        [8..10]
+                speed_limit, tls_dist, tls_state,
+                # SURROUNDINGS [11..18]
+            ] + surroundings   # 8 chiều
 
             obs = np.array(obs_list, dtype=np.float64)
             obs = np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
@@ -272,7 +271,7 @@ class SumoEnv(gym.Env):
             return obs.astype(np.float32)
 
         except Exception:
-            return np.zeros(22, dtype=np.float32)
+            return np.zeros(19, dtype=np.float32)
 
     def _get_dist_to_destination(self):
         try:
@@ -306,56 +305,93 @@ class SumoEnv(gym.Env):
         if not self.veh_data: return 0.0
         d = self.veh_data
 
-        W_SPEED       =  1.3
-        W_PROGRESS    =  0.85
-        W_ENERGY      = -0.10
-        W_COMFORT     = -0.05   # chỉ jerk ga/phanh — KHÔNG phạt tay lái để xe dám chuyển làn
-        W_SAFETY      = -0.8
-        W_TIME        = -0.2
-        W_RED_LIGHT   = -50.0   # phạt cứng mỗi lần vượt đèn đỏ/vàng
-        # W_LANE / W_LANE_OK đã bỏ — SUMO mode 514 đảm nhận việc đưa xe về đúng làn
+        # ------------------------------------------------------------------ #
+        #  TRỌNG SỐ                                                           #
+        # ------------------------------------------------------------------ #
+        W_SPEED_TARGET  =  1.0   # bell-curve bám tốc độ giới hạn
+        W_TOO_SLOW      = -1.5   # phạt chạy dưới MIN_DESIRED_SPEED
+        W_PROGRESS      =  0.85  # tiến về đích
+        W_ENERGY        = -0.15  # hiệu suất năng lượng (Wh/m, không phải Wh/s)
+        W_COMFORT       = -0.05  # jerk ga/phanh
+        W_SAFETY        = -1.0   # TTC-based: 1.5s headway + 5m gap
 
-        # --- Progress ---
+        W_RED_LIGHT     = -50.0  # vượt đèn đỏ/vàng (phạt cứng 1 lần)
+        W_TIME          = -0.2   # penalty sống sót từng bước
+
+        cur_speed = d["speed"]
+        lane_id   = d["lane_id"]
+
+        # ------------------------------------------------------------------ #
+        #  1. SPEED — bell-curve theo tốc độ giới hạn (từ wrappers.py)       #
+        #  Thay thế linear cũ: không còn phạt cứng khi < 3 m/s               #
+        # ------------------------------------------------------------------ #
+        try:
+            speed_limit_ms = traci.lane.getMaxSpeed(lane_id) if lane_id else self.MAX_SPEED
+        except:
+            speed_limit_ms = self.MAX_SPEED
+
+        target_speed = max(speed_limit_ms * self.TARGET_SPEED_RATIO, self.MIN_DESIRED_SPEED)
+        speed_error  = (cur_speed - target_speed) / max(target_speed, 1.0)
+        r_speed_target = float(np.exp(-3.0 * speed_error ** 2))  # [0, 1], đỉnh tại target
+
+        # Too-slow penalty: tăng tuyến tính từ 0 (tại MIN) đến 2.0 (khi dừng hẳn)
+        if cur_speed < self.MIN_DESIRED_SPEED:
+            r_too_slow = 2.0 * (1.0 - cur_speed / self.MIN_DESIRED_SPEED)
+        else:
+            r_too_slow = 0.0
+
+        # ------------------------------------------------------------------ #
+        #  2. PROGRESS — tiến về đích                                        #
+        # ------------------------------------------------------------------ #
         dist = self._get_dist_to_destination()
         if not hasattr(self, "prev_dist"): self.prev_dist = dist
-        progress_reward = np.clip(self.prev_dist - dist, -1.0, 1.0)
+        progress_reward = float(np.clip(self.prev_dist - dist, -1.0, 1.0))
         self.prev_dist = dist
 
-        # --- Speed ---
-        cur_speed    = d["speed"]
-        speed_reward = cur_speed / self.MAX_SPEED
-        if cur_speed < 3.0:
-            speed_reward -= 0.8
+        # ------------------------------------------------------------------ #
+        #  3. ENERGY EFFICIENCY — Wh/m thay vì Wh/s (từ wrappers.py)        #
+        #  Ngăn speed-collapse: xe chậm tốn Wh/m cao hơn xe nhanh            #
+        # ------------------------------------------------------------------ #
+        elec = abs(d["elec"])
+        if cur_speed > 0.5:
+            wh_per_meter   = elec / cur_speed
+            energy_penalty = float(np.clip(wh_per_meter / 0.5, 0.0, 1.0))
+        else:
+            energy_penalty = 1.0  # dừng hẳn → hiệu suất tệ nhất
 
-        # --- Energy ---
-        energy_penalty = np.clip(d["elec"] / self.MAX_ELEC, 0.0, 1.0)
-
-        # --- Comfort: CHỈ jerk của ga/phanh (action[1]), KHÔNG tính tay lái (action[0]) ---
+        # ------------------------------------------------------------------ #
+        #  4. COMFORT — jerk ga/phanh                                        #
+        # ------------------------------------------------------------------ #
         if not hasattr(self, "prev_action"): self.prev_action = action
         accel_jerk = float(np.abs(action[1] - self.prev_action[1]))
         self.prev_action = action
 
-        # --- Safety ---
-        safety_penalty = 0.0
+        # ------------------------------------------------------------------ #
+        #  5. SAFETY — TTC-based (từ wrappers.py)                            #
+        #  safe_dist = 1.5s headway + 5m gap                                 #
+        #  Thay thế exp-penalty cũ dùng khoảng cách cố định                  #
+        # ------------------------------------------------------------------ #
         leader = d["leader"]
-        if cur_speed <= 10.0:   target_dist = 15.0
-        elif cur_speed <= 20.0: target_dist = 30.0
-        else:                   target_dist = 50.0
-        if leader is not None and leader[1] < target_dist:
-            safety_penalty = float(np.exp(-(leader[1] / target_dist)))
+        safe_dist = cur_speed * 1.5 + 5.0
+        if leader is not None:
+            leader_dist_m = leader[1]
+            if leader_dist_m < safe_dist:
+                safety_penalty = float(np.clip(
+                    (safe_dist - leader_dist_m) / safe_dist, 0.0, 1.0
+                ))
+            else:
+                safety_penalty = 0.0
+        else:
+            safety_penalty = 0.0
 
-        # --- Red light penalty ---
-        # Phạt đúng 1 lần khi xe thực sự vượt qua vạch dừng đèn đỏ/vàng.
-        # Cơ chế phát hiện:
-        #   Bước trước: đèn đỏ/vàng, khoảng cách tới đèn < 3m  → đánh dấu _prev_tls_was_red
-        #   Bước này  : road_id bắt đầu bằng ":" (xe đã vào junction)
-        #             → kết luận xe vừa vượt đèn đỏ → phạt cứng 1 lần
+        # ------------------------------------------------------------------ #
+        #  6. RED LIGHT — phạt 1 lần khi xe vượt qua vạch dừng đèn đỏ/vàng #
+        # ------------------------------------------------------------------ #
         road_id = d["road_id"]
         red_light_penalty = 0.0
         if road_id.startswith(":") and getattr(self, "_prev_tls_was_red", False):
             red_light_penalty = 1.0   # W_RED_LIGHT × 1.0 = -50.0 / lần vượt
 
-        # Cập nhật trạng thái cho bước kế tiếp
         tls_data = d["tls"]
         if tls_data:
             tls_dist_raw  = tls_data[0][2]
@@ -367,20 +403,24 @@ class SumoEnv(gym.Env):
         else:
             self._prev_tls_was_red = False
 
-        # --- Tổng hợp ---
-        speed_reward       = np.nan_to_num(speed_reward)
-        progress_reward    = np.nan_to_num(progress_reward)
-        energy_penalty     = np.nan_to_num(energy_penalty)
-        accel_jerk         = np.nan_to_num(accel_jerk)
-        safety_penalty     = np.nan_to_num(safety_penalty)
-        red_light_penalty  = np.nan_to_num(red_light_penalty)
+        # ------------------------------------------------------------------ #
+        #  TỔNG HỢP                                                          #
+        # ------------------------------------------------------------------ #
+        r_speed_target    = np.nan_to_num(r_speed_target)
+        r_too_slow        = np.nan_to_num(r_too_slow)
+        progress_reward   = np.nan_to_num(progress_reward)
+        energy_penalty    = np.nan_to_num(energy_penalty)
+        accel_jerk        = np.nan_to_num(accel_jerk)
+        safety_penalty    = np.nan_to_num(safety_penalty)
+        red_light_penalty = np.nan_to_num(red_light_penalty)
 
-        return (speed_reward      * W_SPEED)      + \
-               (progress_reward   * W_PROGRESS)   + \
-               (accel_jerk        * W_COMFORT)    + \
-               (safety_penalty    * W_SAFETY)     + \
-               (energy_penalty    * W_ENERGY)     + \
-               (red_light_penalty * W_RED_LIGHT)  + \
+        return (r_speed_target    * W_SPEED_TARGET)  + \
+               (r_too_slow        * W_TOO_SLOW)      + \
+               (progress_reward   * W_PROGRESS)      + \
+               (energy_penalty    * W_ENERGY)        + \
+               (accel_jerk        * W_COMFORT)       + \
+               (safety_penalty    * W_SAFETY)        + \
+               (red_light_penalty * W_RED_LIGHT)     + \
                W_TIME
 
     def reset(self, seed=None, options=None):
@@ -569,9 +609,7 @@ class SumoEnv(gym.Env):
                 {"real_speed": 0, "reason": "already_dead", "is_success": 0}
 
         # --- Chuyển đổi LaneChangeMode theo bối cảnh khoảng cách rẽ ---
-        # Dùng giá trị từ cache (đã tính ở cuối bước trước) để tránh gọi hàm thêm
         _, turn_dist_n, lane_offset = self._turn_info_cache
-        # Nếu đang ở 30% cuối của đường VÀ đang sai làn → Bật tự động chuyển làn để cứu (514)
         sumo_rescue_active = turn_dist_n <= 0.3
         if sumo_rescue_active:
             traci.vehicle.setLaneChangeMode(self.VEH_ID, 514)
@@ -581,7 +619,6 @@ class SumoEnv(gym.Env):
         # Áp dụng action
         traci.vehicle.setAcceleration(self.VEH_ID, desired_accel, duration=0.5)
         # Khi SUMO đang cứu xe (mode 514), không phát lệnh changeLane từ agent
-        # để tránh xung đột hai bên → gây dao động qua lại giữa các làn
         if not sumo_rescue_active:
             LC_THRESHOLD     = 0.15
             current_lane_idx = traci.vehicle.getLaneIndex(self.VEH_ID)
@@ -604,7 +641,7 @@ class SumoEnv(gym.Env):
 
         for _ in range(SIM_STEPS):
             traci.simulationStep()
-            self._update_cache()   # Cập nhật cache + turn_info_cache ngay sau mỗi bước
+            self._update_cache()
 
             if self.veh_data is None:
                 terminated = True
@@ -627,7 +664,7 @@ class SumoEnv(gym.Env):
                 state = tls_data[0][3].lower()
                 if 'r' in state or 'y' in state: is_red_light = True
 
-            # OPT 11: Dùng speed từ cache (leader speed cần gọi API vì không có trong cache chính)
+            # OPT 11: Dùng speed từ cache
             is_leader_stopped = (leader is not None and traci.vehicle.getSpeed(leader[0]) < 0.5)
 
             if ego_speed < 0.5 and not (is_red_light or is_leader_stopped):
@@ -662,12 +699,11 @@ class SumoEnv(gym.Env):
             elif self.step_count >= self.MAX_EPISODE_STEPS:
                 truncated = True
                 termination_reason = "timeout"
-                # Phạt thêm nếu timeout mà vẫn đang sai làn
                 _, _, final_offset = self._turn_info_cache
                 if abs(final_offset) > 0.01:
                     reward -= 50.0
 
-        # OPT 12: Chỉ build route_info khi cần (khi episode kết thúc có lỗi)
+        # OPT 12: Chỉ build route_info khi cần
         route_info = ""
         if (terminated or truncated) and termination_reason in ("stuck_too_long", "timeout", "teleport"):
             if hasattr(self, "current_route_edges"):
