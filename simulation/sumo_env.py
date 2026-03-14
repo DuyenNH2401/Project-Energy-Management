@@ -306,12 +306,13 @@ class SumoEnv(gym.Env):
         if not self.veh_data: return 0.0
         d = self.veh_data
 
-        W_SPEED    =  1.3
-        W_PROGRESS =  0.85
-        W_ENERGY   = -0.10
-        W_COMFORT  = -0.05   # chỉ jerk ga/phanh — KHÔNG phạt tay lái để xe dám chuyển làn
-        W_SAFETY   = -0.8
-        W_TIME     = -0.2
+        W_SPEED       =  1.3
+        W_PROGRESS    =  0.85
+        W_ENERGY      = -0.10
+        W_COMFORT     = -0.05   # chỉ jerk ga/phanh — KHÔNG phạt tay lái để xe dám chuyển làn
+        W_SAFETY      = -0.8
+        W_TIME        = -0.2
+        W_RED_LIGHT   = -50.0   # phạt cứng mỗi lần vượt đèn đỏ/vàng
         # W_LANE / W_LANE_OK đã bỏ — SUMO mode 514 đảm nhận việc đưa xe về đúng làn
 
         # --- Progress ---
@@ -343,18 +344,43 @@ class SumoEnv(gym.Env):
         if leader is not None and leader[1] < target_dist:
             safety_penalty = float(np.exp(-(leader[1] / target_dist)))
 
-        # --- Tổng hợp ---
-        speed_reward    = np.nan_to_num(speed_reward)
-        progress_reward = np.nan_to_num(progress_reward)
-        energy_penalty  = np.nan_to_num(energy_penalty)
-        accel_jerk      = np.nan_to_num(accel_jerk)
-        safety_penalty  = np.nan_to_num(safety_penalty)
+        # --- Red light penalty ---
+        # Phạt đúng 1 lần khi xe thực sự vượt qua vạch dừng đèn đỏ/vàng.
+        # Cơ chế phát hiện:
+        #   Bước trước: đèn đỏ/vàng, khoảng cách tới đèn < 3m  → đánh dấu _prev_tls_was_red
+        #   Bước này  : road_id bắt đầu bằng ":" (xe đã vào junction)
+        #             → kết luận xe vừa vượt đèn đỏ → phạt cứng 1 lần
+        road_id = d["road_id"]
+        red_light_penalty = 0.0
+        if road_id.startswith(":") and getattr(self, "_prev_tls_was_red", False):
+            red_light_penalty = 1.0   # W_RED_LIGHT × 1.0 = -50.0 / lần vượt
 
-        return (speed_reward    * W_SPEED)    + \
-               (progress_reward * W_PROGRESS) + \
-               (accel_jerk      * W_COMFORT)  + \
-               (safety_penalty  * W_SAFETY)   + \
-               (energy_penalty  * W_ENERGY)   + \
+        # Cập nhật trạng thái cho bước kế tiếp
+        tls_data = d["tls"]
+        if tls_data:
+            tls_dist_raw  = tls_data[0][2]
+            tls_state_str = tls_data[0][3].lower()
+            self._prev_tls_was_red = (
+                ('r' in tls_state_str or 'y' in tls_state_str)
+                and tls_dist_raw < 3.0
+            )
+        else:
+            self._prev_tls_was_red = False
+
+        # --- Tổng hợp ---
+        speed_reward       = np.nan_to_num(speed_reward)
+        progress_reward    = np.nan_to_num(progress_reward)
+        energy_penalty     = np.nan_to_num(energy_penalty)
+        accel_jerk         = np.nan_to_num(accel_jerk)
+        safety_penalty     = np.nan_to_num(safety_penalty)
+        red_light_penalty  = np.nan_to_num(red_light_penalty)
+
+        return (speed_reward      * W_SPEED)      + \
+               (progress_reward   * W_PROGRESS)   + \
+               (accel_jerk        * W_COMFORT)    + \
+               (safety_penalty    * W_SAFETY)     + \
+               (energy_penalty    * W_ENERGY)     + \
+               (red_light_penalty * W_RED_LIGHT)  + \
                W_TIME
 
     def reset(self, seed=None, options=None):
@@ -378,6 +404,7 @@ class SumoEnv(gym.Env):
         # OPT 8: Xoá cache độ dài edge khi reset episode (map mới có thể khác)
         self._route_edge_lengths = {}
         self._turn_info_cache    = (0.0, 1.0, 0.0)
+        self._prev_tls_was_red   = False
 
         SumoBinary = "sumo-gui" if self.render_mode else "sumo"
         SumoCMD = [SumoBinary, "-c", active_map] + route_arg + \
