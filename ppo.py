@@ -55,7 +55,7 @@ MODEL_DIR = "models/tianshou_ppo/"
 # Log file name (fixed per day to avoid too many files, or add timestamp)
 CSV_FILENAME = f"training_log_{datetime.now().strftime('%d%m%Y_%H%M%S')}.csv"
 CSV_PATH = os.path.join(LOG_DIR, CSV_FILENAME)
-SEED = 42
+SEED = 69
 
 # Header requested by user
 CSV_HEADER = ["episode", "steps", "ep_reward", "avg_speed", "total_energy", "wiggle", "safety", "success", "reason", "route"]
@@ -66,7 +66,7 @@ GAMMA = 0.99
 GAE_LAMBDA = 0.95
 MAX_GRAD_NORM = 0.3
 VF_COEF = 0.25
-ENT_COEF = 0.05  # Tăng lên để khuyến khích agent thử nghiệm nhiều hành động hơn (exploration) thay vì hội tụ sớm
+ENT_COEF = 0.02  # Tăng lên để khuyến khích agent thử nghiệm nhiều hành động hơn (exploration) thay vì hội tụ sớm
 
 TOTAL_TIMESTEPS = 2000000
 STEP_PER_EPOCH = 4096

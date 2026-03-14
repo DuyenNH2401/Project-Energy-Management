@@ -686,10 +686,6 @@ class SumoEnv(gym.Env):
                 termination_reason = "goal"
                 break
 
-        if not hasattr(self, "prev_action"): self.prev_action = action
-        wiggle_stat  = float(np.abs(action[1] - self.prev_action[1]))
-        self.prev_action = action
-
         if not terminated:
             if self.stuck_time > 100:
                 terminated = True
@@ -719,7 +715,6 @@ class SumoEnv(gym.Env):
         info = {
             "real_speed":  avg_real_speed,
             "real_energy": accumulated_energy,
-            "wiggle":      wiggle_stat,
             "safety":      safety_val,
             "step_reward": reward,
             "is_success":  1 if self._success else 0,
