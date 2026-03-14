@@ -389,7 +389,7 @@ class SumoEnv(gym.Env):
         road_id = d["road_id"]
         red_light_penalty = 0.0
         if road_id.startswith(":") and getattr(self, "_prev_tls_was_red", False):
-            red_light_penalty = 1.0   # W_RED_LIGHT × 1.0 = -50.0 / lần vượt
+            red_light_penalty = 10.0   # W_RED_LIGHT × 1.0 = -50.0 / lần vượt
 
         tls_data = d["tls"]
         if tls_data:
