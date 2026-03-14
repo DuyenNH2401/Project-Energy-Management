@@ -39,7 +39,6 @@ class SumoEnv(gym.Env):
         self.MAX_ELEC = 120
         self.MAX_SLOPE = 20
         self.MAX_DIST = 100
-        self.TARGET_DIST = 35.0
         self.TARGET_SPEED_RATIO = 0.9   # bám 90% tốc độ giới hạn
         self.MIN_DESIRED_SPEED  = 3.0   # m/s — dưới mức này bị phạt too_slow
 
@@ -609,7 +608,7 @@ class SumoEnv(gym.Env):
                 {"real_speed": 0, "reason": "already_dead", "is_success": 0}
 
         # --- Chuyển đổi LaneChangeMode theo bối cảnh khoảng cách rẽ ---
-        _, turn_dist_n, lane_offset = self._turn_info_cache
+        _, turn_dist_n, _ = self._turn_info_cache
         sumo_rescue_active = turn_dist_n <= 0.3
         if sumo_rescue_active:
             traci.vehicle.setLaneChangeMode(self.VEH_ID, 514)
