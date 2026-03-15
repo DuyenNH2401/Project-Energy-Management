@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_10_2_random'):
+#def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_10_chuatangred_random'):
+def plot_tianshou_metrics(csv_path, output_dir='reports/tianshou_ppo_plot_pc_chuatangred_random'):
     # 1. Tạo thư mục nếu chưa tồn tại
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

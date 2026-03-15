@@ -45,7 +45,7 @@ VTYPE_ID     = "custom_passenger_car"
 
 # Must mirror your training network exactly
 HIDDEN_SIZES  = [256, 256]
-OBS_SHAPE     = (30,)
+OBS_SHAPE     = (19,)
 ACT_SHAPE     = (2,)
 
 LR            = 3e-4
@@ -254,40 +254,33 @@ def get_veh_data() -> dict | None:
 def get_surroundings(my_speed: float) -> list:
     """
     Mirrors env_random._get_surroundings():
-    8 xe × 2 giá trị (dist, rel_speed) = 16 chiều
-    Layout: [LF1,LF1v, LF2,LF2v, LB1,LB1v, LB2,LB2v,
-             RF1,RF1v, RF2,RF2v, RB1,RB1v, RB2,RB2v]
+    4 xe (LF, LB, RF, RB) × 2 giá trị (dist, rel_speed) = 8 chiều
     """
-    result = [1.0, 0.0] * 8  # 8 slots mặc định
+    result = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]  # LF, LB, RF, RB (dist, relspeed)
 
-    def process_side(neighbors, base_f, base_b):
-        fronts, backs = [], []
+    def process_side(neighbors, f_idx, b_idx):
+        closest_f = float("inf")
+        closest_b = float("inf")
         for n_id, dist in neighbors:
             try:
                 n_speed = traci.vehicle.getSpeed(n_id)
             except Exception:
                 continue
             if dist > 0:
-                fronts.append((dist, n_speed))
+                if dist < closest_f:
+                    closest_f = dist
+                    result[f_idx]     = min(dist, MAX_DIST) / MAX_DIST
+                    result[f_idx + 1] = (my_speed - n_speed) / MAX_SPEED
             else:
-                backs.append((abs(dist), n_speed))
-        fronts.sort(key=lambda x: x[0])
-        backs.sort(key=lambda x: x[0])
-        for slot, (d, spd) in enumerate(fronts[:2]):
-            idx = base_f + slot * 2
-            result[idx]     = min(d, MAX_DIST) / MAX_DIST
-            result[idx + 1] = (my_speed - spd) / MAX_SPEED
-        for slot, (d, spd) in enumerate(backs[:2]):
-            idx = base_b + slot * 2
-            result[idx]     = min(d, MAX_DIST) / MAX_DIST
-            result[idx + 1] = (my_speed - spd) / MAX_SPEED
+                adist = abs(dist)
+                if adist < closest_b:
+                    closest_b = adist
+                    result[b_idx]     = min(adist, MAX_DIST) / MAX_DIST
+                    result[b_idx + 1] = (my_speed - n_speed) / MAX_SPEED
 
     try:
-        # Layout 16 chiều:
-        # [0..3]  = LF1,LF1v,LF2,LF2v  |  [4..7]  = LB1,LB1v,LB2,LB2v
-        # [8..11] = RF1,RF1v,RF2,RF2v   |  [12..15]= RB1,RB1v,RB2,RB2v
-        process_side(traci.vehicle.getNeighbors(VEH_ID, 2), 0, 4)   # trái
-        process_side(traci.vehicle.getNeighbors(VEH_ID, 1), 8, 12)  # phải
+        process_side(traci.vehicle.getNeighbors(VEH_ID, 2), 0, 2)   # trái
+        process_side(traci.vehicle.getNeighbors(VEH_ID, 1), 4, 6)  # phải
     except Exception:
         pass
     return result
@@ -378,7 +371,7 @@ def get_turn_info(d: dict) -> tuple:
 def get_obs(route_len: float) -> np.ndarray:
     d = get_veh_data()
     if d is None:
-        return np.zeros(30, dtype=np.float32)
+        return np.zeros(19, dtype=np.float32)
     try:
         velocity     = np.clip(d["speed"]  / MAX_SPEED,  0.0,  2.0)
         acceleration = np.clip(d["accel"]  / MAX_ACCEL, -1.0,  1.0)
@@ -417,7 +410,7 @@ def get_obs(route_len: float) -> np.ndarray:
         obs_list = [
             velocity, acceleration, elec, norm_lane, slope, lat_offset,
             l_dist, l_rel_speed,
-            speed_limit, turn_dir, turn_dist_n, tls_dist, tls_state, lane_offset,
+            speed_limit, tls_dist, tls_state,
         ] + surroundings
 
         obs = np.array(obs_list, dtype=np.float64)
@@ -425,7 +418,7 @@ def get_obs(route_len: float) -> np.ndarray:
         obs = np.clip(obs, -5.0, 5.0)
         return obs.astype(np.float32)
     except Exception:
-        return np.zeros(30, dtype=np.float32)
+        return np.zeros(19, dtype=np.float32)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +456,7 @@ def step_env(
     desired_accel = accel_cmd * MAX_ACCEL if accel_cmd >= 0 else accel_cmd * MAX_DECEL
 
     if VEH_ID not in traci.vehicle.getIDList():
-        obs = np.zeros(30, dtype=np.float32)
+        obs = np.zeros(19, dtype=np.float32)
         return obs, 0.0, True, False, {"real_speed": 0.0, "reason": "already_dead", "is_success": 0}, stuck_time, action
 
     # ── SUMO rescue: bật mode 514 khi gần cuối edge VÀ đang sai làn ─────────
