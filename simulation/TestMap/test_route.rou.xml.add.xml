@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-01-21T13:44:20.922745+07:00 by Eclipse SUMO netedit v1_25_0+0904-59bbc76848e
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- Vehicles, persons and containers (sorted by depart) -->
+    <trip id="my_ego_car" depart="0.00" color="0,255,0,0" from="254012730" to="-1062498629#0"/>
+</routes>
