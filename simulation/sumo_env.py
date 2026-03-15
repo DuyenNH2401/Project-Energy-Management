@@ -324,8 +324,8 @@ class SumoEnv(gym.Env):
         W_COMFORT       = cfg.REWARD_STAGE3["comfort_jerk"]
         W_SAFETY        = cfg.REWARD_STAGE3["safety"]
 
-        W_RED_LIGHT     = cfg.TERMINAL_REWARDS["red_light_step"]
-        W_TIME          = cfg.TERMINAL_REWARDS["time_penalty"]
+        W_RED_LIGHT     = cfg.REWARD_STAGE3["tls_violation"]
+        W_TIME          = cfg.REWARD_STAGE3["time"]
 
         cur_speed = d["speed"]
         lane_id   = d["lane_id"]
